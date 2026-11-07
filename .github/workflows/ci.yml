@@ -1,0 +1,88 @@
+# Continuous integration (tasks 1.6 and 3.5; R24.1, R24.5, R27.12, R27.13).
+# A change passes only if every step succeeds on both Node.js 24.22.1 and Node.js 26.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks 8.30.1)
+    runs-on: ubuntu-24.04
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      # SHA-256 of gitleaks_8.30.1_linux_x64.tar.gz from the official release checksums.
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned gitleaks
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "${RUNNER_TEMP}/${archive}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check --strict
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" gitleaks
+          "${RUNNER_TEMP}/gitleaks" version
+
+      - name: Scan source, tests, fixtures, and committed configuration
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/gitleaks" dir . --config .gitleaks.toml --redact --no-banner --exit-code 1
+
+  verify:
+    name: Verify (Node.js ${{ matrix.node }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24.22.1', '26']
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js ${{ matrix.node }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # package.json pins engines.node to exactly 24.22.1 (R26.7, task 1.1). On the
+      # Node.js 26 compatibility job npm therefore prints an EBADENGINE "Unsupported
+      # engine" warning. That warning is expected and acceptable as long as `npm ci`
+      # succeeds; engine-strict is deliberately not enabled. Every later step must
+      # still pass on both versions (R27.12).
+      - name: Install from lockfile
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Module boundaries
+        run: npm run deps:check
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build

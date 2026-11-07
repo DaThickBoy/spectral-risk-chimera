@@ -97,7 +97,13 @@
   // Transaction import (R28). Unresolved.
   "import": {
     "oversellPolicy": null,        // OD-6: recommended "REJECT"; "ALLOW_SHORT" permits short positions
-    "defaultTimezone": null        // operator: IANA time zone for date-only timestamps; null rejects date-only rows
+    // defaultTimezone accepts exactly "UTC" or a primary identifier from IANA tzdb
+    // 2026e zone1970.tab (for example "America/New_York", "Asia/Kolkata",
+    // "Europe/Kyiv"). Places that share a primary identifier must use it, not a
+    // city alias: "Europe/Berlin" for Oslo and Stockholm, "Europe/Brussels" for
+    // Amsterdam, "Asia/Riyadh" for Kuwait. Aliases ("Europe/Oslo", "Asia/Calcutta",
+    // "US/Eastern", "Etc/UTC", "GMT") and offsets ("+05:00") are rejected.
+    "defaultTimezone": null        // operator: time zone for date-only timestamps; null rejects date-only rows
   },
 
   // Recalculation materiality (R16.2). Unresolved.

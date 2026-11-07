@@ -1,0 +1,16 @@
+# Generated output and dependencies
+dist/
+coverage/
+node_modules/
+package-lock.json
+
+# Approved specification and steering documents are not reformatted by tooling.
+.kiro/
+
+# The committed configuration template keeps its reviewed layout (task 3.3).
+config/config.template.jsonc
+
+# Seeded fixtures are kept byte-for-byte (lint, boundary, and scanner fixtures).
+test/fixtures/
+
+LICENSE

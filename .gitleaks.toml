@@ -1,0 +1,15 @@
+# gitleaks configuration (task 3.5; R24.1, R24.5). Uses the default rule set.
+# Only generated or third-party content is excluded; source, tests, fixtures,
+# and committed configuration are always scanned.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated and third-party content"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)coverage/''',
+  '''(^|/)\.git/''',
+  '''(^|/)package-lock\.json$''',
+]
