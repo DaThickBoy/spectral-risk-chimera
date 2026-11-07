@@ -1,0 +1,112 @@
+// =============================================================================
+// Spectral Risk Chimera: CONFIGURATION TEMPLATE
+// =============================================================================
+//
+// THIS FILE IS A TEMPLATE. IT IS NEVER LOADED AS RUNTIME CONFIGURATION.
+//
+// - The application reads configuration only from the file named by the
+//   SRC_CONFIG_FILE environment variable. It never opens this template, never
+//   merges values from it, and refuses a SRC_CONFIG_FILE path that resolves
+//   to this file (requirements: Configuration policy 6; design: Config Service).
+// - To configure an environment, copy this file to your own location, fill in
+//   every null placeholder with an explicit decision, and point SRC_CONFIG_FILE
+//   at the copy.
+// - A null value is treated exactly like a missing key. A missing financially
+//   significant setting is reported by key, nothing is substituted, and only
+//   the feature that depends on it is disabled (Configuration policy 1).
+//
+// Contents:
+// - Approved baseline values from the requirements are filled in.
+// - Unresolved financially significant values are null. Each comment names the
+//   open decision (OD-n) and, where one exists, the proposal. A proposal is not
+//   an approved value.
+// - Operational settings are omitted: their documented defaults apply. The
+//   operational settings without a default are listed in comments at the end.
+//
+// No credentials, API keys, or personal contact details belong in this file or
+// in any configuration file. The SEC User-Agent contact is supplied only through
+// the SEC_USER_AGENT environment variable. Other secrets come from environment
+// variables or a secrets manager (R24).
+//
+// Value types: decimal values are JSON strings (R4.3); counts and seconds are
+// JSON integers (R4.7). Exponent notation is never accepted (R4.6).
+// =============================================================================
+{
+  // Historical Simulation VaR (R13, R14). Approved baseline values.
+  // Missing or invalid values here make Base VaR and Adjusted VaR unavailable
+  // (status CONFIG_MISSING, R14.14).
+  "var": {
+    "confidence": "0.95",       // approved baseline (R14.2); 0.99 is also supported
+    "horizonDays": 1,           // fixed at 1 in version 1 (R14.3)
+    "lookbackReturns": 250,     // approved baseline (R14.4)
+    "minObservations": 200      // approved baseline (R13.1)
+  },
+
+  // Sentiment downside adjustment (R15). Approved baseline values.
+  // The adjustment cannot be switched off; there is deliberately no "enabled"
+  // key (R15.1). Missing or invalid values here make only Adjusted VaR
+  // unavailable (ADJUSTMENT_CONFIG_MISSING, R15.8); Base VaR is unaffected.
+  "adjustment": {
+    "bearishThreshold": "-0.60", // approved baseline; trigger is strictly less than this (R15.4)
+    "multiplier": "1.15"         // approved baseline; applied to negative scenario P&L only (R15.5)
+  },
+
+  // Sentiment freshness and aggregation (R9, R10, FR-8). Unresolved.
+  // Missing values here make only Adjusted VaR unavailable (R15.8).
+  "sentiment": {
+    "maxAgeSeconds": null,         // OD-6: proposed 900
+    "windowSeconds": null,         // OD-1: proposed 300 for windowed-mean-v1; must not exceed maxAgeSeconds
+    "maxFutureSkewSeconds": null   // OD-6: proposed 5
+  },
+
+  // Market data cleaning and staleness (FR-3, FR-8, R13.4). Unresolved.
+  "marketData": {
+    "maxStalenessDays": null,      // OD-6: proposed 5
+    "maxReturnGapDays": null       // OD-6: proposed 5
+  },
+
+  // Base currency and FX (R30). Operator decisions; no open decision applies to
+  // the currencies themselves.
+  "fx": {
+    "baseCurrency": null,          // operator: ISO 4217 code, for example "USD"
+    "supportedCurrencies": null,   // operator: list of ISO 4217 codes including the base currency
+    "maxRateAgeSeconds": null      // OD-6: proposed 86400
+  },
+
+  // SEC filing risk freshness (R31). Unresolved.
+  "filing": {
+    "maxAgeDays": null             // OD-6: proposed 120
+  },
+
+  // Alerts (R18, R34). Only alerts.var.metric is approved.
+  // Operational alert settings (cooldownSeconds, severity ratios,
+  // delivery.maxRetries) are omitted; their provisional defaults apply.
+  "alerts": {
+    "var": {
+      "thresholdPct": null,        // OD-6: no proposal; percent of NAV in (0, 100]
+      "metric": "ADJUSTED"         // approved baseline (R18.1); never falls back to BASE when Adjusted VaR is unavailable
+    },
+    "resetPct": null,              // OD-6: recommended equal to alerts.var.thresholdPct
+    "filing": {
+      "threshold": null,           // OD-6: no proposal; FilingRiskScore in [0, 1]
+      "resetThreshold": null,      // OD-6: recommended equal to alerts.filing.threshold
+      "criticalThreshold": null    // optional: null disables the critical filing level (R34.3)
+    }
+  },
+
+  // Transaction import (R28). Unresolved.
+  "import": {
+    "oversellPolicy": null,        // OD-6: recommended "REJECT"; "ALLOW_SHORT" permits short positions
+    "defaultTimezone": null        // operator: IANA time zone for date-only timestamps; null rejects date-only rows
+  },
+
+  // Recalculation materiality (R16.2). Unresolved.
+  "recalc": {
+    "minValueChangePct": null      // OD-6: proposed "0.10" (percent of NAV)
+  }
+
+  // Operational settings without a documented default (not part of this
+  // template; add them to your runtime file only when the feature is used):
+  // - sentiment.rest.pollSeconds: required when a REST sentiment provider is configured
+  // - nlp.maxInputChars: no value until OD-15 (NLP chunking) is decided
+}
