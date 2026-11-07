@@ -1,11 +1,37 @@
 {
   "name": "spectral-risk-chimera",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Multi-source portfolio risk analysis and monitoring (no trading).",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.22.1"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "deps:check": "depcruise src --config .dependency-cruiser.mjs",
+    "test": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts --passWithNoTests"
   },
   "keywords": [],
-  "type": "commonjs"
+  "license": "MIT",
+  "dependencies": {
+    "decimal.js": "10.6.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "dependency-cruiser": "18.7.2",
+    "eslint": "10.14.0",
+    "fast-check": "4.10.2",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "5.1.0"
+  }
 }

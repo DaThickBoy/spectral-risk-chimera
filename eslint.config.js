@@ -1,0 +1,133 @@
+// ESLint flat config (task 1.3; R4.2, R4.4, R27.13; financial-rules 1, 2, 7).
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+
+/** Financial modules: no native-number parsing or arithmetic helpers (R4.2). */
+export const FINANCIAL_MODULE_FILES = [
+  'src/risk/**/*.ts',
+  'src/portfolio/**/*.ts',
+  'src/fx/**/*.ts',
+  'src/ingestion/**/*.ts',
+];
+
+const DECIMAL_CONSTRUCTION = [
+  {
+    selector: "NewExpression[callee.name='Decimal']",
+    message: 'Construct Decimal values only with d() from src/shared/decimal.ts (financial-rules 1).',
+  },
+  {
+    selector: "NewExpression[callee.name='DEC']",
+    message: 'Construct Decimal values only with d() from src/shared/decimal.ts (financial-rules 1).',
+  },
+];
+
+const CHART_NUMBER_IMPORT = [
+  {
+    selector: "ImportSpecifier[imported.name='toChartNumber']",
+    message: 'toChartNumber may be imported only by src/web/chartAdapter.ts (R4.4).',
+  },
+  {
+    selector: "ExportSpecifier[local.name='toChartNumber']",
+    message: 'toChartNumber may be re-exported only by src/shared/ (R4.4).',
+  },
+];
+
+const NATIVE_NUMBER_SYNTAX = [
+  {
+    selector: "CallExpression[callee.name='Number']",
+    message: 'Number() is forbidden on financial values; use d() (R4.2).',
+  },
+  {
+    selector: "UnaryExpression[operator='+']",
+    message: 'Unary + is forbidden on financial values; use d() (R4.2).',
+  },
+  {
+    selector: "MemberExpression[object.name='Math']",
+    message: 'Math.* is forbidden in financial modules; use Decimal methods (R4.2).',
+  },
+  {
+    selector: "MemberExpression[object.name='Number'][property.name='parseFloat']",
+    message: 'Number.parseFloat is forbidden on financial values; use d() (R4.2).',
+  },
+];
+
+const DECIMAL_CLONE = {
+  object: 'Decimal',
+  property: 'clone',
+  message: 'Decimal.clone is allowed only in src/shared/decimal.ts (financial-rules 1).',
+};
+
+const DECIMAL_JS_IMPORT = {
+  paths: [
+    {
+      name: 'decimal.js',
+      allowTypeImports: true,
+      message: 'Import Decimal helpers from src/shared/ instead of decimal.js (financial-rules 1).',
+    },
+  ],
+};
+
+export default tseslint.config(
+  {
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'test/fixtures/**'],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.strict,
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        { 'ts-ignore': true, 'ts-nocheck': true, 'ts-expect-error': 'allow-with-description' },
+      ],
+      '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'separate-type-imports' }],
+      'no-restricted-syntax': ['error', ...DECIMAL_CONSTRUCTION, ...CHART_NUMBER_IMPORT],
+      'no-restricted-properties': ['error', DECIMAL_CLONE],
+      '@typescript-eslint/no-restricted-imports': ['error', DECIMAL_JS_IMPORT],
+    },
+  },
+  {
+    files: FINANCIAL_MODULE_FILES,
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        { name: 'parseFloat', message: 'parseFloat is forbidden on financial values; use d() (R4.2).' },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        ...DECIMAL_CONSTRUCTION,
+        ...CHART_NUMBER_IMPORT,
+        ...NATIVE_NUMBER_SYNTAX,
+      ],
+    },
+  },
+  {
+    // The Decimal helper is the only place that configures and constructs Decimal.js.
+    files: ['src/shared/decimal.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...CHART_NUMBER_IMPORT],
+      'no-restricted-properties': 'off',
+      '@typescript-eslint/no-restricted-imports': 'off',
+    },
+  },
+  {
+    // The shared public API re-exports toChartNumber; the chart adapter consumes it.
+    files: ['src/shared/index.ts', 'src/web/chartAdapter.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...DECIMAL_CONSTRUCTION],
+    },
+  },
+  {
+    // The Decimal helper's own unit test exercises toChartNumber.
+    files: ['test/unit/shared/decimal.test.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...DECIMAL_CONSTRUCTION],
+    },
+  },
+);

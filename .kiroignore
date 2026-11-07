@@ -1,4 +1,27 @@
-node_modules/  
-.next/  
-dist/  
-*.log 
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Private credentials
+*.pem
+*.key
+*.p12
+credentials/
+secrets/
+
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+.next/
+coverage/
+
+# Logs
+*.log
+
+# Private or large data
+data/private/
+data/raw/

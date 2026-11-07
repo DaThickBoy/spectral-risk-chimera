@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 build/
+.next/
 coverage/
 
 # Environment variables
@@ -14,17 +15,11 @@ coverage/
 # Logs
 *.log
 
-# Private credentials
-*.pem
-*.key
-*.p12
-credentials/
-secrets/
-
-# Local databases
+# Local databases and private data
 *.db
 *.sqlite
 *.sqlite3
+data/private/
 
 # Operating system
 .DS_Store
