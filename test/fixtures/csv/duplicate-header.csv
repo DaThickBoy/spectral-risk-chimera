@@ -1,0 +1,2 @@
+trade_timestamp,ticker,type,quantity,price,currency,ticker
+2026-11-02T14:30:00Z,AAA,BUY,10,150.25,USD,AAA
