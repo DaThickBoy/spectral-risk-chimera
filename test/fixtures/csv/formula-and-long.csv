@@ -1,0 +1,6 @@
+trade_timestamp,ticker,type,quantity,price,currency,external_id
+2026-11-02T14:30:00Z,"=HYPERLINK(""http://evil.example"")",BUY,+1,-2+3,@SUM(A1),=cmd|' /C calc'!A0
+
+2026-11-02T14:31:00Z,AAA,BUY,1,1,USD,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+,,,,,,
+2026-11-02T14:32:00Z,BBB,SELL,2,3,EUR,ok

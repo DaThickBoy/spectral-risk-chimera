@@ -41,18 +41,22 @@ Integers that are not money (array indexes, counts, observation counts, retry at
 ## 3. Read financial inputs as decimal strings
 
 - Every financial field in a CSV cell, FIX tag, JSON body, provider payload, config file, or database column is text.
-- Provider JSON must be parsed with the project lossless JSON parser so numeric tokens like `0.1` stay text. `JSON.parse` on provider payloads is forbidden because it converts numbers to binary floats before validation.
+- Provider JSON must be parsed with the project lossless JSON parser so numeric tokens like `0.1` stay text: each JSON number becomes a `LosslessJsonNumber` holding its exact source text (`src/shared/losslessJson.ts`). `JSON.parse` on provider payloads is forbidden because it converts numbers to binary floats before validation.
 - Decimal strings must match the fixed decimal grammar: optional `-`, digits, optional `.` and digits. Exponent notation (for example `1e-5`) is always rejected; there is no configurable exponent limit (R4.6). No thousands separators, no `NaN` or `Infinity`.
 
 ```ts
 // CORRECT
-const raw = parseLossless(responseText);            // numeric tokens stay as text
-const payload = PriceBarSchema.parse(raw);          // Zod: DecimalStringSchema
-const close = d(payload.close);
+const raw = parser.parse(responseText);             // LosslessJsonParser: Result, never throws
+if (!raw.ok) return raw;                            // JSON_PARSE_ERROR, no input text in the message
+const payload = PriceBarSchema.parse(raw.value);    // Zod: close is z.instanceof(LosslessJsonNumber)
+const closeText = DecimalStringSchema.safeParse(payload.close.text);   // exact token text; "1e-5" fails here
+if (!closeText.success) return reject('MALFORMED_NUMBER', closeText.error);
+const close = d(closeText.data);
 
 // INCORRECT
 const payload = JSON.parse(responseText);           // 0.1 already lost exactness
 const close = new Decimal(payload.close);
+const close = d(String(payload.close));             // a JSON number is a LosslessJsonNumber, not a string; use .text
 ```
 
 ## 4. Never use parseFloat before Decimal construction
@@ -105,6 +109,7 @@ const pct = varAbs.dividedBy(nav).times(100);
 - Serialize with `toCanonical()` (no exponent, no trailing fractional zeros, no negative zero). Use it for JSON responses, WebSocket messages, database `TEXT` columns, snapshots, audit details, and logs.
 - Database columns holding financial values are `TEXT`, never `REAL`, `FLOAT`, or `NUMERIC` with float affinity.
 - Never put a financial value into a JSON number, query parameter as a number, or `JSON.stringify` a `Decimal` implicitly. Convert explicitly first.
+- One narrow exception (task 9.4, approved decision C2): the observation prices of a stored market-data series (`price_series.observations_json`) keep the exact decimal text that the series cleaner produced (for example `"100.0"`), because the series `contentHash` is computed over that text and must verify on reload (D-10, R32). They must still match the fixed decimal grammar (no exponent, no separators, no `NaN` or `Infinity`), and the hash is recomputed on every read. This exception covers no other column, payload, or log; everything else is canonical.
 
 ```ts
 // CORRECT

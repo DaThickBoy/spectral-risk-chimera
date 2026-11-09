@@ -3,7 +3,7 @@ node_modules/
 
 # Build output
 dist/
-build/
+/build/
 .next/
 coverage/
 
@@ -15,6 +15,8 @@ coverage/
 # Logs
 *.log
 
+# Local benchmark records (task 7.7; valid for the recorded environment only, OD-2)
+bench-results/
 # Local databases and private data
 *.db
 *.sqlite
@@ -24,3 +26,6 @@ data/private/
 # Operating system
 .DS_Store
 Thumbs.db
+# Playwright output (task 17.5)
+test-results/
+playwright-report/

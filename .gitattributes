@@ -1,3 +1,6 @@
 # Normalize text files to LF in the repository and working tree so the Prettier
 # format check (endOfLine: lf) gives the same result on Windows, Linux, and CI.
 * text=auto eol=lf
+# Recorded ECB responses (task 10.2, ECB adapter rule 9) are kept byte for byte,
+# including their CRLF line endings: no end-of-line conversion.
+test/fixtures/fx/ecb/*.csv -text

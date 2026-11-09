@@ -295,6 +295,9 @@ describe('AT-CFG-06: operational defaults are applied and logged, provisional on
     });
     const summary = records().find((record) => record['msg'] === 'config.loaded');
     expect(summary?.['provisionalDefaults']).toEqual([
+      'fx.ecb.timeoutMs',
+      'fx.ecb.maxResponseBytes',
+      'fx.ecb.cacheMaxEntries',
       'alerts.cooldownSeconds',
       'alerts.severity.highRatio',
       'alerts.severity.criticalRatio',

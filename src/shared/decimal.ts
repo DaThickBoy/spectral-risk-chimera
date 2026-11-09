@@ -125,6 +125,32 @@ export function roundMoney(x: Decimal, minorUnits: number): Decimal {
 }
 
 /**
+ * Display text of a monetary value (FR-14, task 17.3): `roundMoney` to the
+ * currency's minor units, written with exactly that many decimals (`"1000.00"`).
+ * Display only: the canonical value stays the reported value and is never replaced.
+ */
+export function formatMoneyDisplay(value: DecimalString, minorUnits: number): string {
+  // toFixed on the already rounded Decimal only pads; it does not round again.
+  return roundMoney(d(value), minorUnits).toFixed(minorUnits);
+}
+
+/**
+ * ISO 4217 minor units of a currency (2 for EUR, USD, GBP; 0 for JPY), from the
+ * runtime's ICU currency data. A count of decimal places, not a financial value.
+ */
+export function currencyMinorUnits(currency: string): number {
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    throw new TypeError('currency must be a three-letter ISO 4217 code.');
+  }
+  const digits: unknown = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions()
+    .maximumFractionDigits;
+  if (typeof digits !== 'number' || !Number.isInteger(digits) || digits < 0 || digits > 4) {
+    throw new RangeError(`No minor-unit information for ${currency}.`);
+  }
+  return digits;
+}
+
+/**
  * The only conversion from a financial value to a native number (R4.4).
  * For chart pixel and axis values in `src/web/chartAdapter.ts` only; the result
  * is display-only and must never be used in a calculation, sent to the API, or stored.

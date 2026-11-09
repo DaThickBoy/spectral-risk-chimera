@@ -2,6 +2,7 @@
 dist/
 coverage/
 node_modules/
+bench-results/
 package-lock.json
 
 # Approved specification and steering documents are not reformatted by tooling.
@@ -9,6 +10,9 @@ package-lock.json
 
 # The committed configuration template keeps its reviewed layout (task 3.3).
 config/config.template.jsonc
+# The hackathon demo configuration (DR-KW-1, H3) keeps its reviewed layout; the
+# configuration loader does not accept the trailing commas Prettier would add.
+config/demo/kiroween-2026.demo.jsonc
 
 # Seeded fixtures are kept byte-for-byte (lint, boundary, and scanner fixtures).
 test/fixtures/

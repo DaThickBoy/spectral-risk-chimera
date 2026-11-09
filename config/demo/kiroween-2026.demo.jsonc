@@ -1,0 +1,112 @@
+// =============================================================================
+// Spectral Risk Chimera: KIROWEEN 2026 DEMO CONFIGURATION (decision H3)
+// =============================================================================
+//
+// DEMO ONLY. This file is NOT the template, NOT a production configuration, and
+// supplies no default to any other configuration.
+//
+// - It carries "demo.profile". A configuration with that marker starts only in
+//   the explicit demo mode (`--demo-fixtures`); any other start is refused with
+//   DEMO_CONFIG_OUTSIDE_DEMO_MODE. Production start-up stays blocked (H5).
+// - Use it with: SRC_CONFIG_FILE=config/demo/kiroween-2026.demo.jsonc and
+//   `npm start -- --demo-fixtures --port <n> --allowed-origin <origin>`.
+// - Market data is the deterministic DEMO fixture set; FX comes from the ECB
+//   reference rates (fx.provider "ECB", EUR base), approved for the hackathon
+//   demo only (H2). Inverted rates are derived values, attributed as such.
+// - Every value filled in here for a setting that has no approved value MUST be
+//   listed in "demo.provisionalKeys"; the list and each key's status are logged
+//   at start (start.demo_config, start.ready).
+// - null is treated as a missing key: the dependent feature stays disabled and
+//   the key is reported (Configuration policy 1). Nothing is substituted.
+//
+// Demo values approved for the hackathon demo ONLY (DR-KW-1, H3, 2026-11-09). They
+// are listed in demo.provisionalKeys and do not resolve OD-6 for real use:
+// - fx.maxRateAgeSeconds         345600 (4 days; Easter's 120 h closure is NOT covered)
+// - marketData.maxStalenessDays  5
+// - marketData.maxReturnGapDays  5
+// - recalc.minValueChangePct     "0.10"
+// - import.oversellPolicy        "REJECT" (needed to seed the demo portfolios)
+// Still empty, not approved: import.defaultTimezone (the seeded rows carry explicit
+// UTC timestamps, so it is not needed), the alert thresholds (demo results never
+// alert anyway, R30.11), and filing.maxAgeDays (no SEC in the demo, H8).
+// Adjusted VaR stays unavailable by design (H7: no approved aggregation method,
+// OD-1), so the sentiment settings below are left null as well.
+//
+// This file keeps its reviewed layout (.prettierignore), like the template.
+// =============================================================================
+{
+  "demo": {
+    "profile": "KIROWEEN_2026_DEMO",
+    "provisionalKeys": [
+      "fx.maxRateAgeSeconds",
+      "marketData.maxStalenessDays",
+      "marketData.maxReturnGapDays",
+      "recalc.minValueChangePct",
+      "import.oversellPolicy"
+    ]
+  },
+
+  // Approved baseline values (Configuration policy 2).
+  "var": {
+    "confidence": "0.95",
+    "horizonDays": 1,
+    "lookbackReturns": 250,
+    "minObservations": 200
+  },
+  "adjustment": {
+    "bearishThreshold": "-0.60",
+    "multiplier": "1.15"
+  },
+
+  // Unresolved (OD-6, OD-1). Adjusted VaR is unavailable in the demo either way (H7).
+  "sentiment": {
+    "maxAgeSeconds": null,
+    "windowSeconds": null,
+    "maxFutureSkewSeconds": null
+  },
+
+  // Unresolved (OD-6).
+  "marketData": {
+    "maxStalenessDays": 5,      // DR-KW-1 H3: approved for the hackathon demo only
+    "maxReturnGapDays": 5       // DR-KW-1 H3: approved for the hackathon demo only
+  },
+
+  // H2 (hackathon demo only): EUR base with the ECB reference rates; H6: EUR, GBP, USD.
+  "fx": {
+    "baseCurrency": "EUR",
+    "supportedCurrencies": ["EUR", "GBP", "USD"],
+    "provider": "ECB",
+    // DR-KW-1 H3: four days, approved for the hackathon demo only. Covers weekends with a
+    // 24-hour margin and the 2026-27 Christmas and New Year closures (96 h); NOT Easter (120 h).
+    "maxRateAgeSeconds": 345600
+  },
+
+  // SEC filing risk is not configured in this demo (H8).
+  "filing": {
+    "maxAgeDays": null
+  },
+
+  // Only alerts.var.metric is approved. Demo results carry DEMO_DATA and never alert (R30.11).
+  "alerts": {
+    "var": {
+      "thresholdPct": null,
+      "metric": "ADJUSTED"
+    },
+    "resetPct": null,
+    "filing": {
+      "threshold": null,
+      "resetThreshold": null
+    }
+  },
+
+  // Unresolved (OD-6); needed by the import that seeds the demo portfolios.
+  "import": {
+    "oversellPolicy": "REJECT", // DR-KW-1 H3: approved for the hackathon demo only
+    "defaultTimezone": null
+  },
+
+  // Unresolved (OD-6).
+  "recalc": {
+    "minValueChangePct": "0.10" // DR-KW-1 H3: approved for the hackathon demo only
+  }
+}

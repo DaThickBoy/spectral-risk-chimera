@@ -22,6 +22,15 @@ export default defineConfig({
         },
       },
       {
+        // Dashboard component tests (task 17.3): React rendered into jsdom.
+        oxc: { jsx: { runtime: 'automatic' } },
+        test: {
+          name: 'web',
+          include: ['test/web/**/*.test.tsx'],
+          environment: 'jsdom',
+        },
+      },
+      {
         test: {
           name: 'integration',
           include: ['test/integration/**/*.test.ts'],

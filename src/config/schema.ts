@@ -59,6 +59,9 @@ export function isCanonicalTimeZone(name: string): boolean {
   return ACCEPTED_TIME_ZONES.has(name);
 }
 
+/** The only accepted demonstration profile (Kiroween decision H3). */
+export const DEMO_PROFILE = 'KIROWEEN_2026_DEMO';
+
 const uniqueCurrencies = z
   .array(Iso4217Code)
   .min(1)
@@ -100,6 +103,16 @@ export const ConfigSchema = z.strictObject({
     baseCurrency: Iso4217Code,
     supportedCurrencies: uniqueCurrencies,
     maxRateAgeSeconds: z.int().positive(),
+    // R30.3: selected explicitly, no default. `ECB` requires the EUR base (ECB_REQUIRES_EUR_BASE).
+    provider: z.enum(['FIXTURE', 'ECB']),
+    // Operational settings of the ECB adapter (task 10.2); provisional defaults (OD-6).
+    ecb: z
+      .strictObject({
+        timeoutMs: z.int().positive().default(10_000),
+        maxResponseBytes: z.int().positive().default(1_048_576),
+        cacheMaxEntries: z.int().min(1).default(64),
+      })
+      .prefault({}),
   }),
   filing: z.strictObject({
     maxAgeDays: z.int().positive(),
@@ -175,12 +188,46 @@ export const ConfigSchema = z.strictObject({
       maxInputChars: z.int().positive().optional(),
     })
     .prefault({}),
-  provider: z.strictObject({ maxRetries: z.int().nonnegative().default(3) }).prefault({}),
+  provider: z
+    .strictObject({
+      maxRetries: z.int().nonnegative().default(3),
+      timeoutMs: z.int().positive().default(10_000),
+      backoff: z
+        .strictObject({
+          baseMs: z.int().positive().default(250),
+          maxMs: z.int().positive().default(10_000),
+        })
+        .prefault({}),
+      circuit: z
+        .strictObject({
+          failureThreshold: z.int().positive().default(5),
+          openMs: z.int().positive().default(60_000),
+        })
+        .prefault({}),
+      retryAfter: z.strictObject({ maxMs: z.int().positive().default(600_000) }).prefault({}),
+    })
+    .prefault({}),
   ws: z.strictObject({ maxQueueSize: z.int().positive().default(1000) }).prefault({}),
   api: z
     .strictObject({
       rateLimitPerMinute: z.int().positive().default(60),
       uploadRateLimitPerMinute: z.int().positive().default(10),
+    })
+    .prefault({}),
+  /**
+   * Demonstration profile marker (Kiroween decision H3). Present only in a separate
+   * demo configuration file, never in the template. A configuration that carries it
+   * starts only in the explicit demo mode (`--demo-fixtures`); `provisionalKeys`
+   * names the settings whose values in that file are provisional demo choices, not
+   * approved values, and is reported at start. It supplies no value of its own.
+   */
+  demo: z
+    .strictObject({
+      profile: z.literal(DEMO_PROFILE).optional(),
+      provisionalKeys: z
+        .array(z.string().min(1))
+        .refine((keys) => new Set(keys).size === keys.length, { message: 'keys must be unique' })
+        .optional(),
     })
     .prefault({}),
 });
@@ -242,6 +289,10 @@ export const CONFIG_KEY_META = {
   'fx.baseCurrency': { cls: 'F', features: ['baseVaR'] },
   'fx.supportedCurrencies': { cls: 'F', features: ['baseVaR'] },
   'fx.maxRateAgeSeconds': { cls: 'F', features: ['baseVaR'] },
+  'fx.provider': { cls: 'F', features: ['baseVaR'] },
+  'fx.ecb.timeoutMs': { cls: 'O', features: ['baseVaR'], provisional: true },
+  'fx.ecb.maxResponseBytes': { cls: 'O', features: ['baseVaR'], provisional: true },
+  'fx.ecb.cacheMaxEntries': { cls: 'O', features: ['baseVaR'], provisional: true },
   'filing.maxAgeDays': { cls: 'F', features: ['filing', 'filingAlerts'] },
   'alerts.var.thresholdPct': { cls: 'F', features: ['varAlerts'] },
   'alerts.var.metric': { cls: 'F', features: ['varAlerts'] },
@@ -269,9 +320,17 @@ export const CONFIG_KEY_META = {
   'nlp.maxRetries': { cls: 'O', features: ['filing'] },
   'nlp.maxInputChars': { cls: 'O', features: ['filing'], optional: true },
   'provider.maxRetries': { cls: 'O', features: PROVIDERS },
+  'provider.timeoutMs': { cls: 'O', features: PROVIDERS },
+  'provider.backoff.baseMs': { cls: 'O', features: PROVIDERS },
+  'provider.backoff.maxMs': { cls: 'O', features: PROVIDERS },
+  'provider.circuit.failureThreshold': { cls: 'O', features: PROVIDERS },
+  'provider.circuit.openMs': { cls: 'O', features: PROVIDERS },
+  'provider.retryAfter.maxMs': { cls: 'O', features: PROVIDERS },
   'ws.maxQueueSize': { cls: 'O', features: ['sentimentIngestion'] },
   'api.rateLimitPerMinute': { cls: 'O', features: ['api'] },
   'api.uploadRateLimitPerMinute': { cls: 'O', features: ['api'] },
+  'demo.profile': { cls: 'O', features: [], optional: true },
+  'demo.provisionalKeys': { cls: 'O', features: [], optional: true },
 } as const satisfies Record<string, ConfigKeyMeta>;
 
 export type ConfigKey = keyof typeof CONFIG_KEY_META;
@@ -340,10 +399,33 @@ export const CROSS_KEY_RULES: readonly CrossKeyRule[] = [
     holds: (v) => dec(v('alerts.severity.highRatio')).lessThan(dec(v('alerts.severity.criticalRatio'))),
   },
   {
+    id: 'BACKOFF_MAX_AT_LEAST_BASE',
+    keys: ['provider.backoff.baseMs', 'provider.backoff.maxMs'],
+    message: 'provider.backoff.baseMs must not exceed provider.backoff.maxMs',
+    holds: (v) => int(v('provider.backoff.baseMs')) <= int(v('provider.backoff.maxMs')),
+  },
+  {
     id: 'BASE_CURRENCY_SUPPORTED',
     keys: ['fx.baseCurrency', 'fx.supportedCurrencies'],
     message: 'fx.supportedCurrencies must include fx.baseCurrency',
     holds: (v) => (v('fx.supportedCurrencies') as readonly string[]).includes(v('fx.baseCurrency') as string),
+  },
+  {
+    // R30.3 / OD-5: the ECB publishes only euro reference rates; no triangulation exists.
+    id: 'ECB_REQUIRES_EUR_BASE',
+    keys: ['fx.provider', 'fx.baseCurrency'],
+    message: 'fx.provider ECB requires fx.baseCurrency EUR',
+    holds: (v) => v('fx.provider') !== 'ECB' || v('fx.baseCurrency') === 'EUR',
+  },
+  {
+    // H3: a demo file may only mark existing, non-demo settings as provisional.
+    id: 'DEMO_PROVISIONAL_KEYS_KNOWN',
+    keys: ['demo.provisionalKeys'],
+    message: 'demo.provisionalKeys must name configuration keys outside demo.*',
+    holds: (v) =>
+      (v('demo.provisionalKeys') as readonly string[]).every(
+        (key) => (CONFIG_KEYS as readonly string[]).includes(key) && !key.startsWith('demo.'),
+      ),
   },
 ];
 

@@ -12,4 +12,8 @@ paths = [
   '''(^|/)coverage/''',
   '''(^|/)\.git/''',
   '''(^|/)package-lock\.json$''',
+  # Task 8.2, AT-SEC-23: the private key of a test-only, self-signed localhost
+  # certificate that no system trusts. Exact path only; it is used solely by the
+  # local HTTPS test server and never outside tests.
+  '''^test/fixtures/tls/untrusted-localhost\.key\.pem$''',
 ]

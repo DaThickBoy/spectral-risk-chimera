@@ -23,7 +23,7 @@ Code lives in these modules under `src/`. Each has one responsibility.
 
 | Module | Responsibility | May import |
 |---|---|---|
-| `shared/` | Decimal helper, canonical JSON, lossless JSON, clock, errors, `Result`, redaction | nothing project-internal |
+| `shared/` | Decimal helper, canonical JSON, lossless JSON, clock, sleeper, errors, `Result`, redaction, provider resilience (`ResilientCall`, `ProviderError`, circuit breaker), data status and last-valid store | nothing project-internal |
 | `config/` | Zod config schema, loader, config version | `shared` |
 | `audit/` | Append-only audit log | `shared`, `persistence` ports |
 | `ingestion/` | CSV and FIX parsing, normalization, dedupe, quarantine | `shared`, `config`, `audit`, `portfolio` types, `persistence` ports |
@@ -33,13 +33,18 @@ Code lives in these modules under `src/`. Each has one responsibility.
 | `sentiment/` | REST and WebSocket ingestion, aggregation, emission | `shared`, `config`, own ports |
 | `risk/` | VaR engine, adjustment, snapshots, scheduler, worker | `shared`, `config`, `portfolio`, `marketdata`, `fx`, `sentiment` types |
 | `alerts/` | Evaluation, state machine, dispatch | `shared`, `config`, `risk` and `sec` result types |
-| `app/` | Use-case services that wire domain modules to ports | domain modules, ports |
+| `app/` | Use-case services that coordinate domain logic, persistence ports, and outbound ports (for example `PositionEventPublisher`); owns post-commit event publication | `shared`, `config`, domain modules (through `index.ts`), `persistence` ports |
 | `persistence/`, `adapters/` | Database and external provider implementations | the ports they implement |
 | `api/` | HTTP and WebSocket gateway, auth guard, view models | `app` services, shared API contracts |
 | `web/` | Dashboard UI (separate Vite build) | shared API contract types and `toChartNumber` only |
 
 Rules:
 - Dependencies point inward. Domain modules never import `adapters/`, `persistence/` implementations, `app/`, `api/`, or `web/`.
+- `portfolio/` is pure: it never imports persistence (ports or implementations) or the event bus. Reading the ledger, writing positions, and publishing `PositionsChanged` happen in `app/` (design D-16).
+- `app/` never imports `persistence/` implementations, `adapters/`, `api/`, or `web/`. Concrete implementations are injected into it.
+- Domain events are published by `app/` only after `UnitOfWork.run` has returned successfully, never from inside the unit-of-work callback. `UnitOfWork.run` is synchronous; never pass an `async` callback.
+- A position rebuild reconciles all persisted positions of a portfolio against the complete ledger replay. Its upserts and deletes of orphaned positions happen in one unit of work. Only positions (a projection) have a delete operation; the transaction ledger and the audit log never do.
+- The composition root (constructing concrete persistence, event-bus, logger, and clock implementations and injecting them into `app/` services) is deferred to a later application bootstrap task, which also decides its location and boundary rule. Until then, tests inject fakes.
 - `risk/` must not import `sec/` or `nlp/`. `FilingRiskScore` never reaches the risk engine.
 - `web/` never imports domain modules. It talks to the backend only through the API and WebSocket contracts.
 - Import other modules through their `index.ts` public API, never their internal files.
@@ -49,7 +54,8 @@ Rules:
 
 - Domain logic is pure where possible: explicit inputs, explicit outputs, no hidden I/O. The risk engine is a pure function of `RiskInput`.
 - External systems sit behind interfaces (ports): market data, FX, sentiment, SEC, NLP, persistence, clock. Inject them; do not import a concrete client inside domain code.
-- Use the `Clock` interface for all time. Never call `Date.now()` or `new Date()` directly in domain code.
+- Use the `Clock` interface for all time. Never call `Date.now()` or `new Date()` directly in domain code. Waits and timeouts go through the injected `Sleeper`, and randomness (for example retry jitter) through an injected `random()`, so tests are deterministic.
+- Provider calls go through `ResilientCall` (`shared/`). Concrete transports (HTTPS clients) live in `adapters/`, never in `shared/`. TLS certificate verification is always on: no code sets `rejectUnauthorized` to anything but `true`, sets a custom `ca` outside tests, or reads `NODE_TLS_REJECT_UNAUTHORIZED`.
 - Return `Result<T, E>` with typed error codes from domain and adapter functions. Throw only for programmer errors.
 - Keep functions small and single-purpose. A file over about 300 lines is a signal to split it.
 - Every module has tests in `test/`. Use fakes for ports instead of network calls. Name each correctness property test after its `Property N` heading in the design.
@@ -75,6 +81,7 @@ Rules:
 - Exported functions declare explicit parameter and return types.
 - Use discriminated unions for states and results (`status: 'OK' | 'INSUFFICIENT_DATA' | ...`), and handle every case with an exhaustive `switch`.
 - Reject unknown fields in request and config schemas. Prefer `z.strictObject()`; the `.strict()` form used in `financial-rules.md` examples is equivalent and still supported in Zod 4. Use `z.iso.datetime()` rather than the deprecated `z.string().datetime()`. Use `z.partialRecord()` when an enum-keyed record may omit keys.
+- Exception for persisted timestamps: any timestamp stored under the project's fixed UTC millisecond contract (`IsoUtc`, `YYYY-MM-DDTHH:mm:ss.sssZ`), or validated before it is stored (for example audit event times), must use the shared `IsoUtcMillis` schema (or `isIsoUtcMillis`) from `src/shared/timestamps.ts`, not `z.iso.datetime()`. It checks real calendar and clock values and rejects offsets, other precisions, and expanded years, so every boundary and persistence adapter accepts exactly the same form.
 - Shared API contracts (request, response, WebSocket events) live in one place and are imported by both `api/` and `web/`.
 
 ## 6. Configuration
@@ -98,7 +105,7 @@ Rules:
 - [ ] Strict TypeScript, ES modules (`NodeNext`, `verbatimModuleSyntax`), no `any`, no `@ts-ignore`.
 - [ ] Built with `tsc` to `dist/`; workers start from compiled `.js`.
 - [ ] Exact dependency pins and a committed lockfile.
-- [ ] Imports respect module boundaries; `risk/` does not import `sec/` or `nlp/`; dependency-cruiser passes.
+- [ ] Imports respect module boundaries; `risk/` does not import `sec/` or `nlp/`; `portfolio/` imports no persistence or event bus; dependency-cruiser passes.
 - [ ] External systems are behind injected ports; time comes from `Clock`.
 - [ ] No financial calculations in `web/`.
 - [ ] Every external input has a Zod 4 schema; types come from `z.infer`.

@@ -1,0 +1,80 @@
+# GitHub Pages: the static DEMO replay of the dashboard (OD-21, approved 2026-11-09; Kiroween
+# decision H4). It publishes ONLY the built dashboard (dist/web/) with the deterministic replay
+# recorded from the real backend in demo mode with fixture providers and the fixed reference
+# clock. No backend, no write route, no secret, no live provider, and no paid service is involved.
+#
+# One-time manual repository setting (cannot be changed from this workflow):
+#   Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+# The deployment is not live until that setting is made and a run of this workflow on `main`
+# has succeeded; the page is then served at https://<owner>.github.io/<repository>/.
+name: Pages (static DEMO replay)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+# Least privilege by default; only the deploy job may write to Pages.
+permissions:
+  contents: read
+# One deployment at a time; a running deployment is never cancelled midway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    name: Validate, build, record the replay, and test it in a browser
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24.22.1
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - name: Install from lockfile
+        run: npm ci
+      - name: Type-check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Format check
+        run: npm run format:check
+      - name: Module boundaries
+        run: npm run deps:check
+      - name: Tests
+        run: npm test
+      - name: Build backend and dashboard
+        run: npm run build
+      # Deterministic: fixed reference clock, DEMO market-data fixtures, and one recorded ECB
+      # response (SHA-256 checked). It never contacts a live provider and fails on any gap.
+      - name: Record the static replay
+        run: npm run export:replay
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests against the replay under the Pages subpath
+        run: npm run test:e2e
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Upload the static site (dist/web only)
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist/web
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

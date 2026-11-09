@@ -1,4 +1,4 @@
-# Continuous integration (tasks 1.6 and 3.5; R24.1, R24.5, R27.12, R27.13).
+# Continuous integration (tasks 1.6, 3.5, and 25.3; R24.1, R24.5, R26.5, R27.12, R27.13).
 # A change passes only if every step succeeds on both Node.js 24.22.1 and Node.js 26.
 name: CI
 
@@ -42,6 +42,29 @@ jobs:
           set -euo pipefail
           "${RUNNER_TEMP}/gitleaks" dir . --config .gitleaks.toml --redact --no-banner --exit-code 1
 
+  # Task 25.3 (R26.5): npm audit on every change. Fails on high and critical findings;
+  # lower severities are reported in the log without failing. All dependencies are
+  # audited, including dev dependencies (no --omit). It reads package-lock.json, so
+  # nothing is installed and no package scripts run. Findings are reviewed as
+  # described in SECURITY.md; that procedure never suppresses a finding or changes
+  # this gate. Local `npm test` stays offline and does not run the audit.
+  dependency-audit:
+    name: Dependency audit (npm audit, high and critical fail)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24.22.1
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+
+      - name: Audit all dependencies
+        run: npm audit --audit-level=high
+
   verify:
     name: Verify (Node.js ${{ matrix.node }})
     runs-on: ubuntu-24.04
@@ -69,6 +92,12 @@ jobs:
       - name: Install from lockfile
         run: npm ci
 
+      # Task 25.3 (R26.5, AT-ARC-05): every dependency is pinned exactly, and the
+      # lockfile matches package.json and carries an integrity hash for every package.
+      # Offline: reads package.json and package-lock.json only.
+      - name: Dependency pins and lockfile integrity
+        run: npx vitest run test/unit/build/packageConfig.test.ts
+
       - name: Type-check
         run: npm run typecheck
 
@@ -86,3 +115,28 @@ jobs:
 
       - name: Build
         run: npm run build
+  # Task 17.5 (OD-21): the built dashboard with the deterministic replay, in Chromium, under the
+  # GitHub Pages subpath. Offline apart from the pinned browser download; no live provider.
+  e2e:
+    name: Browser tests (Playwright, Chromium)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24.22.1
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - name: Install from lockfile
+        run: npm ci
+      - name: Build backend and dashboard
+        run: npm run build
+      - name: Record the static replay
+        run: npm run export:replay
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npm run test:e2e
