@@ -74,7 +74,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.strict,
   {
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -104,6 +104,41 @@ export default tseslint.config(
         ...DECIMAL_CONSTRUCTION,
         ...CHART_NUMBER_IMPORT,
         ...NATIVE_NUMBER_SYNTAX,
+      ],
+    },
+  },
+  {
+    // Dashboard (architecture rule 4): no financial calculation in web/. Native-number parsing
+    // and Math are forbidden; values are rendered as backend text. Decimal.js is not imported.
+    files: ['src/web/**/*.ts', 'src/web/**/*.tsx'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'parseFloat',
+          message: 'No numeric parsing in the dashboard; render backend text (architecture 4).',
+        },
+        {
+          name: 'parseInt',
+          message: 'No numeric parsing in the dashboard; render backend text (architecture 4).',
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        ...DECIMAL_CONSTRUCTION,
+        ...CHART_NUMBER_IMPORT,
+        ...NATIVE_NUMBER_SYNTAX,
+      ],
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'decimal.js',
+              message: 'The dashboard never computes financial values (architecture 4).',
+            },
+          ],
+        },
       ],
     },
   },

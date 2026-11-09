@@ -45,6 +45,21 @@ export default {
       to: { path: '^src/(sec|nlp)/' },
     },
     {
+      name: 'filing-text-not-to-sentiment',
+      comment:
+        'SEC filing text never becomes sentiment input (R8.6): nlp/ and sec/ must not import sentiment/.',
+      severity: 'error',
+      from: { path: '^src/(nlp|sec)/' },
+      to: { path: '^src/sentiment/' },
+    },
+    {
+      name: 'sentiment-text-not-to-filing',
+      comment: 'Sentiment text never reaches filing scoring (R8.6): sentiment/ must not import nlp/ or sec/.',
+      severity: 'error',
+      from: { path: '^src/sentiment/' },
+      to: { path: '^src/(nlp|sec)/' },
+    },
+    {
       name: 'domain-not-to-outer-layers',
       comment: 'Domain modules never import adapters/, persistence implementations, app/, api/, or web/.',
       severity: 'error',
@@ -53,10 +68,12 @@ export default {
     },
     {
       name: 'web-not-to-domain',
-      comment: 'web/ talks to the backend only through API contracts; it may import src/shared/ only.',
+      comment:
+        'web/ talks to the backend only through API contracts: from src/ it may import only the browser-safe ' +
+        'shared API contract index (src/shared/apiContracts/index.ts), never a domain module (task 17.2).',
       severity: 'error',
       from: { path: '^src/web/' },
-      to: { path: '^src/', pathNot: ['^src/web/', '^src/shared/'] },
+      to: { path: '^src/', pathNot: ['^src/web/', '^src/shared/apiContracts/index\\.ts$'] },
     },
     {
       name: 'outer-layers-not-to-web',
@@ -81,15 +98,39 @@ export default {
     },
     {
       name: 'cross-module-through-index',
-      comment: 'Import another module through its index.ts public API, never its internal files.',
+      comment:
+        'Import another module through its index.ts public API, never its internal files. web/ is governed by ' +
+        'web-not-to-domain instead (it uses the browser-safe contract index, not src/shared/index.ts).',
       severity: 'error',
-      from: { path: '^src/([^/]+)/' },
+      from: { path: '^src/([^/]+)/', pathNot: '^src/web/' },
       to: {
         path: '^src/[^/]+/',
         pathNot: ['^src/$1/', '^src/[^/]+/index\\.ts$', '^src/persistence/ports\\.ts$'],
       },
     },
     ...moduleRules,
+    {
+      // Design D-16: app/ coordinates domain logic, persistence ports, and event publication.
+      // Concrete persistence implementations and adapters are injected, never imported.
+      name: 'boundary-app',
+      comment:
+        'src/app/ may import only: shared, config, domain modules (through index.ts), and persistence ports.',
+      severity: 'error',
+      from: { path: '^src/app/' },
+      to: {
+        path: '^src/',
+        pathNot: ['^src/app/', ...DOMAIN.map((module) => `^src/${module}/`), '^src/persistence/ports\\.ts$'],
+      },
+    },
+    {
+      // Application bootstrap (composition root): src/main/ wires every module except web/
+      // (outer-layers-not-to-web) and is the only module allowed to depend on all others.
+      name: 'nothing-imports-main',
+      comment: 'Only the composition root itself uses src/main/; no other module imports it.',
+      severity: 'error',
+      from: { path: '^src/', pathNot: '^src/main/' },
+      to: { path: '^src/main/' },
+    },
     {
       name: 'no-unresolvable',
       comment: 'Every import must resolve, so boundary rules cannot be bypassed by resolution failures.',

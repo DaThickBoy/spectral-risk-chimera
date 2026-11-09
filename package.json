@@ -8,30 +8,54 @@
     "node": "24.22.1"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json && vite build --config vite.web.config.ts",
+    "build:web": "vite build --config vite.web.config.ts",
+    "dev:web": "vite --config vite.web.config.ts",
+    "export:replay": "node dist/main/replayExport.js --ecb-fixtures test/fixtures/fx/ecb --out dist/web/replay",
+    "serve:pages": "node scripts/serve-pages.mjs",
+    "test:e2e": "playwright test",
+    "start": "node dist/main/start.js",
+    "typecheck": "tsc --noEmit && tsc -p src/web/tsconfig.json && tsc -p test/web/tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "deps:check": "depcruise src --config .dependency-cruiser.mjs",
     "test": "vitest run",
-    "test:live": "vitest run --config vitest.live.config.ts --passWithNoTests"
+    "test:live": "vitest run --config vitest.live.config.ts --passWithNoTests",
+    "bench:csv": "vitest run --config vitest.bench.config.ts csvIngestion",
+    "bench:var": "vitest run --config vitest.bench.config.ts varEngine",
+    "bench:sentiment": "vitest run --config vitest.bench.config.ts sentimentHandler",
+    "soak": "vitest run --config vitest.soak.config.ts"
   },
   "keywords": [],
   "license": "MIT",
   "dependencies": {
+    "@fastify/multipart": "10.1.8",
+    "@fastify/websocket": "11.3.7",
+    "csv-parse": "7.0.3",
     "decimal.js": "10.6.0",
+    "fastify": "5.12.8",
+    "ws": "8.22.2",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.0",
     "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/ws": "8.18.2",
+    "axe-core": "4.14.0",
     "dependency-cruiser": "18.7.2",
     "eslint": "10.14.0",
     "fast-check": "4.10.2",
+    "jsdom": "31.0.0",
     "prettier": "3.9.10",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
+    "vite": "8.3.6",
     "vitest": "5.1.0"
   }
 }
