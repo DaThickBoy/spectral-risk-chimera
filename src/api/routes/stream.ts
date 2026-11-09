@@ -12,7 +12,8 @@
  *   loopback-only (`listenApiServer`).
  * - Origin: the `Origin` header must be one of the caller's `allowedOrigins`
  *   (exact match); a missing or other origin is 403 `ORIGIN_FORBIDDEN` before
- *   upgrade, which blocks cross-site WebSocket hijacking and DNS rebinding.
+ *   upgrade, which blocks cross-site WebSocket hijacking and DNS rebinding. The
+ *   list is validated by the shared `origin.ts`, as for the HTTP request guard.
  * - Query and path parameters are strict empty Zod objects (400 otherwise).
  * - Inbound: clients may not send messages. Any message closes the connection
  *   with 1008; frames above `STREAM_MAX_INBOUND_BYTES` are refused by `ws`
@@ -27,6 +28,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Logger } from '../../shared/index.js';
 import { sendError } from '../errors.js';
+import { isAllowedOrigin, parseAllowedOrigins } from '../origin.js';
 import type { ApiRoutes } from '../server.js';
 import type { StreamHub } from '../streamHub.js';
 
@@ -42,20 +44,9 @@ export interface StreamRouteDependencies {
 
 const EMPTY = z.strictObject({});
 
-function validOrigin(origin: string): boolean {
-  try {
-    const url = new URL(origin);
-    return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === origin;
-  } catch {
-    return false;
-  }
-}
-
 export function streamRoutes(deps: StreamRouteDependencies): ApiRoutes {
-  if (deps.allowedOrigins.length === 0 || !deps.allowedOrigins.every(validOrigin)) {
-    throw new TypeError('allowedOrigins must list at least one exact http(s) origin.');
-  }
-  const allowed = new Set(deps.allowedOrigins);
+  // The same validation as the HTTP request guard (origin.ts, Gateway rule 9).
+  const allowed = parseAllowedOrigins(deps.allowedOrigins);
   const { hub, logger } = deps;
 
   return (app: FastifyInstance) => {
@@ -80,8 +71,7 @@ export function streamRoutes(deps: StreamRouteDependencies): ApiRoutes {
       });
 
       scoped.addHook('onRequest', async (request, reply) => {
-        const origin = request.headers.origin;
-        if (origin === undefined || !allowed.has(origin)) {
+        if (!isAllowedOrigin(request.headers.origin, allowed)) {
           return sendError(reply, request, 403, 'ORIGIN_FORBIDDEN', 'The origin is not allowed.');
         }
         if (hub.clientCount >= hub.maxClients) {

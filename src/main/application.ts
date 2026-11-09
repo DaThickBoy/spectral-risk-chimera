@@ -69,6 +69,10 @@ export interface ApplicationOptions extends Omit<
   readonly listen: ListenOptions;
   /** `/stream` limits (15.1): caller options, no configuration keys. */
   readonly stream: {
+    /**
+     * Exact origins (`--allowed-origin`) for the `/stream` upgrade and, through the request
+     * guard (Gateway rule 9), for every state-changing HTTP request.
+     */
     readonly allowedOrigins: readonly string[];
     readonly maxClients: number;
     readonly maxBufferedBytes: number;
@@ -358,6 +362,8 @@ export function createApplication(options: ApplicationOptions): Application {
           },
           uploads: { maxFileBytes: gateway.get('import.maxFileBytes') as number },
           routes: routes(),
+          // Gateway rule 9: Host must name the bound loopback socket; writes need an allowed Origin.
+          requestGuard: { allowedOrigins: options.stream.allowedOrigins },
           ...(options.authGuard === undefined ? {} : { authGuard: options.authGuard }),
         });
         const address = await listenApiServer(server, options.listen);

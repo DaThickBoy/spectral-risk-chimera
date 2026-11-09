@@ -46,8 +46,10 @@ async function gateway(
     guard?: AuthGuard;
   } = {},
 ) {
+  // Listening requires the request guard (Gateway rule 9), with the same origin list as /stream.
   const server = testServer([], options.guard, {
     rateLimits: options.rateLimits ?? { perMinute: 1000, uploadPerMinute: 10 },
+    requestGuard: { allowedOrigins: [ORIGIN] },
   });
   const hub = createStreamHub({
     logger: server.logger,

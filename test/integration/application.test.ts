@@ -5,6 +5,7 @@
 // test/integration/build.test.ts.
 // Validates: Requirements 14.14, 16.1, 17.10, 18.7, 19.1, 19.5, 25.1, 30.11, 34.7
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -178,16 +179,17 @@ const until = async (check: () => boolean, ms = 5000): Promise<void> => {
 };
 
 async function createPortfolioAndImport(address: string): Promise<void> {
+  // State-changing requests carry an allowed Origin (Gateway rule 9).
   const created = await fetch(`${address}/portfolios`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', origin: ORIGIN },
     body: JSON.stringify({ id: PF, base_currency: 'USD', cash: '0' }),
   });
   expect(created.status).toBe(201);
   const { headers, payload } = multipart([{ name: 'file', filename: 'trades.csv', content: CSV }]);
   const imported = await fetch(`${address}/portfolios/${PF}/imports`, {
     method: 'POST',
-    headers,
+    headers: { ...headers, origin: ORIGIN },
     body: payload,
   });
   expect(imported.status).toBe(201);
@@ -347,7 +349,7 @@ describe('configuration gating (architecture section 6)', () => {
     const address = await b.app.start();
     const created = await fetch(`${address}/portfolios`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', origin: ORIGIN },
       body: JSON.stringify({ id: PF, base_currency: 'USD', cash: '0' }),
     });
     expect(created.status).toBe(404);
@@ -365,6 +367,122 @@ describe('configuration gating (architecture section 6)', () => {
       status: 'CONFIG_MISSING',
       baseVaR: { validity: 'UNAVAILABLE', value: null, missingKeys: ['var.confidence'] },
     });
+  });
+});
+
+/** One raw request with exactly the given headers (node:http, so any Host can be sent). */
+function rawRequest(
+  address: string,
+  method: string,
+  route: string,
+  headers: Record<string, string>,
+): Promise<number> {
+  const url = new URL(address);
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      { host: url.hostname, port: Number(url.port), method, path: route, headers, setHost: false },
+      (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode ?? 0));
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+describe('request guard on the assembled application (Gateway rule 9; not authentication, OD-7)', () => {
+  const EVIL = 'https://evil.example';
+  const createPortfolio = (address: string, headers: Record<string, string>) =>
+    fetch(`${address}/portfolios`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify({ id: PF, base_currency: 'USD', cash: '0' }),
+    });
+
+  it('portfolio creation: refused without or with a foreign Origin, accepted with the allowed one', async () => {
+    const b = build(testConfig());
+    const address = await b.app.start();
+    for (const headers of [{}, { origin: EVIL }, { origin: 'null' }, { origin: `${ORIGIN}/` }]) {
+      const refused = await createPortfolio(address, headers);
+      expect(refused.status, JSON.stringify(headers)).toBe(403);
+      expect(((await refused.json()) as { error: { code: string } }).error.code).toBe('ORIGIN_FORBIDDEN');
+    }
+    expect(b.uow.snapshot().portfolios).toEqual([]);
+    expect((await createPortfolio(address, { origin: ORIGIN })).status).toBe(201);
+    expect(b.uow.snapshot().portfolios.map((p) => p.id)).toEqual([PF]);
+  });
+
+  it('CSV import: a cross-site multipart upload is refused and stores nothing', async () => {
+    const b = build(testConfig());
+    const address = await b.app.start();
+    expect((await createPortfolio(address, { origin: ORIGIN })).status).toBe(201);
+    const upload = (headers: Record<string, string>) => {
+      const { headers: form, payload } = multipart([{ name: 'file', filename: 'trades.csv', content: CSV }]);
+      return fetch(`${address}/portfolios/${PF}/imports`, {
+        method: 'POST',
+        headers: { ...form, ...headers },
+        body: payload,
+      });
+    };
+    for (const headers of [{}, { origin: EVIL }, { origin: 'null' }]) {
+      expect((await upload(headers)).status, JSON.stringify(headers)).toBe(403);
+    }
+    expect(b.uow.snapshot().transactions).toEqual([]);
+    expect(b.uow.snapshot().imports).toEqual([]);
+    const imported = await upload({ origin: ORIGIN });
+    expect(imported.status).toBe(201);
+    expect(b.uow.snapshot().transactions).toHaveLength(1);
+  });
+
+  it('alert dismissal: refused without the allowed Origin, unchanged behaviour with it', async () => {
+    const b = build(testConfig((c) => withKey(c, 'alerts.var.metric', 'BASE')));
+    const address = await b.app.start();
+    await createPortfolioAndImport(address);
+    await until(() => b.uow.snapshot().alerts.length === 1);
+    const id = b.uow.snapshot().alerts[0]?.id ?? '';
+    const dismiss = (headers: Record<string, string>) =>
+      fetch(`${address}/alerts/${id}/dismiss`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: '{}',
+      });
+    for (const headers of [{}, { origin: EVIL }, { origin: 'null' }]) {
+      expect((await dismiss(headers)).status, JSON.stringify(headers)).toBe(403);
+    }
+    expect(b.uow.snapshot().alerts[0]?.state).toBe('OPEN');
+    const dismissed = await dismiss({ origin: ORIGIN });
+    expect(dismissed.status).toBe(200);
+    expect(await dismissed.json()).toMatchObject({ id, state: 'DISMISSED' });
+    expect((await dismiss({ origin: ORIGIN })).status).toBe(409); // ALERT_NOT_OPEN, as before
+  });
+
+  it('Host: the bound 127.0.0.1 and localhost ports are accepted; foreign names and ports are 421', async () => {
+    const b = build(testConfig());
+    const address = await b.app.start();
+    const port = new URL(address).port;
+    expect(await rawRequest(address, 'GET', '/providers/status', { host: `127.0.0.1:${port}` })).toBe(200);
+    expect(await rawRequest(address, 'GET', '/providers/status', { host: `localhost:${port}` })).toBe(200);
+    for (const host of ['evil.example', `evil.example:${port}`, '127.0.0.1:1', `[::1]:${port}`]) {
+      expect(await rawRequest(address, 'GET', '/providers/status', { host }), host).toBe(421);
+    }
+    // A rebinding page has a foreign Host, so even an allowed-looking Origin cannot write.
+    expect(
+      await rawRequest(address, 'POST', '/alerts/x/dismiss', {
+        host: `evil.example:${port}`,
+        origin: ORIGIN,
+        'content-type': 'application/json',
+      }),
+    ).toBe(421);
+  });
+
+  it('read-only requests and the /stream upgrade keep working with the allowed origin', async () => {
+    const b = build(testConfig());
+    const address = await b.app.start();
+    expect((await fetch(`${address}/providers/status`)).status).toBe(200);
+    expect((await fetch(`${address}/alerts?portfolioId=${PF}`)).status).toBe(200);
+    await client(address);
+    await until(() => b.app.hub.clientCount === 1);
   });
 });
 

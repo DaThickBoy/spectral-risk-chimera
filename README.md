@@ -81,6 +81,7 @@ SRC_CONFIG_FILE=config/demo/kiroween-2026.demo.jsonc SRC_DATABASE_FILE=/tmp/src-
 - **Seeding:** at startup it seeds two portfolios: `demo-eur-usd-gbp` (EUR, USD, and GBP holdings, EUR base) and `demo-eur-only`.
 - **Live ECB request:** in this live local mode the backend requests the current rates from the ECB API. If the ECB is unreachable or the rate is stale, the multi-currency portfolio shows _FX UNAVAILABLE_ or _STALE_, and the EUR-only portfolio still calculates.
 - **Read-only endpoints:** `GET /dashboard` and `GET /dashboard/portfolios/<id>`.
+- **Request guard:** the backend accepts only a `Host` of `127.0.0.1:<port>` or `localhost:<port>` for its own port, which blocks DNS rebinding. `POST`, `PUT`, `PATCH`, and `DELETE` also need an `Origin` that exactly matches an `--allowed-origin` value, which blocks cross-site writes. A script that writes to the local API must send that `Origin` header. This is not authentication (OD-7 is still open).
 - **Stopping:** stop with Ctrl+C.
 
 ### Dashboard against the local backend
@@ -152,6 +153,7 @@ src/
   alerts/       Alert evaluation and state machine
   app/          Use cases: valuation, recorder, risk service, dashboard service
   persistence/  Ports, in-memory and SQLite adapters, migrations
+  audit/        Append-only audit log (redacted details)
   adapters/     HTTPS transport, ECB adapter, SEC and WebSocket transports
   api/          Fastify gateway and routes
   main/         Composition root, demo start, demo fixtures, replay exporter
@@ -170,6 +172,7 @@ test/           unit, property, integration, web, e2e, fixtures (recorded ECB re
 - **Holiday calendar.** Weekends only (OD-3).
 - **Production mode.** Undefined (OD-19); production startup is blocked.
 - **No authentication** (OD-7). The backend binds to loopback only and must not be exposed publicly. The public demo is a static replay with no backend.
+- **Cross-origin reads of the local backend.** The request guard blocks cross-site writes, but it does not require an `Origin` on `GET`. While the local backend runs, a web page open in the same browser can still send `GET` requests to it. It cannot read the responses, and no `GET` changes a portfolio, the ledger, or an alert. However, the valuation reads (positions, allocation, dashboard view) can trigger outbound FX provider requests, record FX observations, and use up the shared rate limit. Removing these side effects from reads is planned as separate hardening work.
 - **Demo configuration values** (freshness and staleness thresholds, oversell policy) are approved for the hackathon only, not for real use (OD-6).
 
 ## Security

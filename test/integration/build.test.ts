@@ -181,9 +181,16 @@ describe('executable entry point (src/main/start.ts, compiled)', () => {
         true,
       ]);
 
-      const created = await fetch(`${address}/portfolios`, {
+      // Gateway rule 9 in the compiled entry point: a write without an allowed Origin is refused.
+      const forbidden = await fetch(`${address}/portfolios`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: 'pf-smoke', base_currency: 'USD', cash: '0' }),
+      });
+      expect(forbidden.status).toBe(403);
+      const created = await fetch(`${address}/portfolios`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: ORIGIN },
         body: JSON.stringify({ id: 'pf-smoke', base_currency: 'USD', cash: '0' }),
       });
       expect(created.status).toBe(201);
@@ -192,7 +199,7 @@ describe('executable entry point (src/main/start.ts, compiled)', () => {
       const { headers, payload } = multipart([{ name: 'file', filename: 'trades.csv', content: csv }]);
       const imported = await fetch(`${address}/portfolios/pf-smoke/imports`, {
         method: 'POST',
-        headers,
+        headers: { ...headers, origin: ORIGIN },
         body: payload,
       });
       expect(imported.status).toBe(201);

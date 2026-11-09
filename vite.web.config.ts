@@ -4,6 +4,8 @@
 // the data source is chosen with VITE_DASHBOARD_SOURCE ("replay", the default, or "live").
 // In development, `/dashboard` is proxied to the local demo backend named by
 // SRC_DASHBOARD_BACKEND (for example http://127.0.0.1:8080); the backend stays on loopback.
+// `changeOrigin: true` makes the proxy send the backend's own `Host` (127.0.0.1:<backend port>),
+// which the backend's Host guard (Gateway rule 9) requires; the proxied requests are GET only.
 import { defineConfig } from 'vite';
 
 const backend = process.env['SRC_DASHBOARD_BACKEND'];
@@ -20,7 +22,7 @@ export default defineConfig({
   },
   server: {
     host: '127.0.0.1',
-    ...(backend === undefined ? {} : { proxy: { '/dashboard': { target: backend, changeOrigin: false } } }),
+    ...(backend === undefined ? {} : { proxy: { '/dashboard': { target: backend, changeOrigin: true } } }),
   },
   preview: { host: '127.0.0.1' },
 });

@@ -19,7 +19,9 @@
  * - `adjustedVaRAvailability`: the explicit OD-1 reason when no aggregator is
  *   assembled (H7); the VarView status codes are unchanged;
  * - `filing`: `NOT_CONFIGURED` (H8), no score.
- * Nothing is written. Valuation runs on request, as for the positions route; no
+ * No portfolio, ledger, or alert data is written. Valuation runs on request, as for the
+ * positions route, so the recording FX service may append FX observation records and
+ * providers may be called (design: Gateway rule 9, known limitation); no
  * retrieval is scheduled.
  *
  * Validates: Requirements 17.1, 17.10, 20.6, 30.14, 35.1, 35.6.

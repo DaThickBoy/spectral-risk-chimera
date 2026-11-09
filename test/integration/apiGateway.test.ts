@@ -167,8 +167,12 @@ describe('Gateway rule 2: loopback only', () => {
   it.each(['0.0.0.0', 'localhost', '::1', '::', '192.168.1.10', '127.0.0.2', ' 127.0.0.1'])(
     'listening on %j is refused before binding',
     async (host) => {
+      // An unguarded instance: HOST_NOT_LOOPBACK (not REQUEST_GUARD_MISSING) proves the host
+      // check runs before the request-guard check (Gateway rules 2 and 9).
       const { app } = testServer();
-      await expect(listenApiServer(app, { host, port: 0 })).rejects.toBeInstanceOf(ListenRefusedError);
+      const refused = listenApiServer(app, { host, port: 0 });
+      await expect(refused).rejects.toBeInstanceOf(ListenRefusedError);
+      await expect(refused).rejects.toMatchObject({ reason: 'HOST_NOT_LOOPBACK' });
       expect(app.server.listening).toBe(false);
     },
   );
@@ -187,8 +191,10 @@ describe('Gateway rule 2: loopback only', () => {
     await expect(listenApiServer(app, { host: LOOPBACK_HOST, port: 70_000 })).rejects.toThrow(TypeError);
   });
 
-  it('127.0.0.1 binds and serves', async () => {
-    const { app } = testServer([echoRoutes]);
+  it('127.0.0.1 binds and serves (with the mandatory request guard, Gateway rule 9)', async () => {
+    const { app } = testServer([echoRoutes], undefined, {
+      requestGuard: { allowedOrigins: ['http://127.0.0.1:5173'] },
+    });
     const address = await listenApiServer(app, { host: LOOPBACK_HOST, port: 0 });
     try {
       expect(address).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
@@ -197,6 +203,17 @@ describe('Gateway rule 2: loopback only', () => {
     } finally {
       await app.close();
     }
+  });
+
+  it('a host refusal carries reason HOST_NOT_LOOPBACK', async () => {
+    const { app } = testServer([], undefined, {
+      requestGuard: { allowedOrigins: ['http://127.0.0.1:5173'] },
+    });
+    await expect(listenApiServer(app, { host: '0.0.0.0', port: 0 })).rejects.toMatchObject({
+      name: 'ListenRefusedError',
+      reason: 'HOST_NOT_LOOPBACK',
+    });
+    expect(app.server.listening).toBe(false);
   });
 });
 

@@ -1,6 +1,12 @@
 // Test helpers for the API gateway (task 4.2): a capturing redacting logger and a server factory.
 import { createApiServer } from '../../src/api/index.js';
-import type { ApiRoutes, AuthGuard, RateLimits, UploadLimits } from '../../src/api/index.js';
+import type {
+  ApiRoutes,
+  AuthGuard,
+  RateLimits,
+  RequestGuardOptions,
+  UploadLimits,
+} from '../../src/api/index.js';
 import { FakeClock, createLogger } from '../../src/shared/index.js';
 import type { Logger } from '../../src/shared/index.js';
 
@@ -25,6 +31,8 @@ export function capturingLogger(): CapturedLogger {
 export interface TestServerOptions {
   readonly rateLimits?: RateLimits;
   readonly uploads?: UploadLimits;
+  /** Required for tests that listen on a socket (Gateway rule 9); `inject()` tests omit it. */
+  readonly requestGuard?: RequestGuardOptions;
 }
 
 /** Documented class O defaults (60 / 10 per minute, 10 MiB), unless a test overrides them. */
@@ -42,6 +50,7 @@ export function testServer(
     uploads: options.uploads ?? { maxFileBytes: 10 * 1024 * 1024 },
     routes,
     ...(authGuard === undefined ? {} : { authGuard }),
+    ...(options.requestGuard === undefined ? {} : { requestGuard: options.requestGuard }),
   });
   return { app, clock, ...captured };
 }

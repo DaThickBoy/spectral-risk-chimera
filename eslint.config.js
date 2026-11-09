@@ -51,6 +51,28 @@ const NATIVE_NUMBER_SYNTAX = [
   },
 ];
 
+/**
+ * Gateway rule 9: production code listens only through `listenApiServer`, which refuses a
+ * server built without the Host and Origin request guard. Calls only (`x.listen(...)`,
+ * `x?.listen(...)`, `x['listen'](...)`); reading a `listen` option is not a call.
+ */
+const LISTEN_CALL = [
+  {
+    selector: "CallExpression > MemberExpression.callee[property.name='listen']",
+    message:
+      'Call .listen() only in src/api/server.ts; use listenApiServer so the request guard is enforced (Gateway rule 9).',
+  },
+  {
+    selector: "CallExpression > MemberExpression.callee[property.value='listen']",
+    message:
+      'Call .listen() only in src/api/server.ts; use listenApiServer so the request guard is enforced (Gateway rule 9).',
+  },
+];
+
+/** Production code: everything under src/ except the guarded listen entry point. */
+const PRODUCTION_FILES = ['src/**/*.ts', 'src/**/*.tsx'];
+const LISTEN_ENTRY_POINT = 'src/api/server.ts';
+
 const DECIMAL_CLONE = {
   object: 'Decimal',
   property: 'clone',
@@ -93,6 +115,15 @@ export default tseslint.config(
     },
   },
   {
+    // Gateway rule 9: no direct .listen() in production code outside the guarded entry point.
+    // Later src/ blocks replace no-restricted-syntax, so each of them repeats LISTEN_CALL.
+    files: PRODUCTION_FILES,
+    ignores: [LISTEN_ENTRY_POINT],
+    rules: {
+      'no-restricted-syntax': ['error', ...DECIMAL_CONSTRUCTION, ...CHART_NUMBER_IMPORT, ...LISTEN_CALL],
+    },
+  },
+  {
     files: FINANCIAL_MODULE_FILES,
     rules: {
       'no-restricted-globals': [
@@ -104,6 +135,7 @@ export default tseslint.config(
         ...DECIMAL_CONSTRUCTION,
         ...CHART_NUMBER_IMPORT,
         ...NATIVE_NUMBER_SYNTAX,
+        ...LISTEN_CALL,
       ],
     },
   },
@@ -128,6 +160,7 @@ export default tseslint.config(
         ...DECIMAL_CONSTRUCTION,
         ...CHART_NUMBER_IMPORT,
         ...NATIVE_NUMBER_SYNTAX,
+        ...LISTEN_CALL,
       ],
       '@typescript-eslint/no-restricted-imports': [
         'error',
@@ -146,7 +179,7 @@ export default tseslint.config(
     // The Decimal helper is the only place that configures and constructs Decimal.js.
     files: ['src/shared/decimal.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...CHART_NUMBER_IMPORT],
+      'no-restricted-syntax': ['error', ...CHART_NUMBER_IMPORT, ...LISTEN_CALL],
       'no-restricted-properties': 'off',
       '@typescript-eslint/no-restricted-imports': 'off',
     },
@@ -155,7 +188,7 @@ export default tseslint.config(
     // The shared public API re-exports toChartNumber; the chart adapter consumes it.
     files: ['src/shared/index.ts', 'src/web/chartAdapter.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...DECIMAL_CONSTRUCTION],
+      'no-restricted-syntax': ['error', ...DECIMAL_CONSTRUCTION, ...LISTEN_CALL],
     },
   },
   {

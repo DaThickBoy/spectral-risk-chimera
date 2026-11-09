@@ -5,7 +5,9 @@
  * - `GET /dashboard`: the portfolios the dashboard lists.
  * - `GET /dashboard/portfolios/:id`: one `DashboardViewResponse`; 404 when the
  *   portfolio is unknown or has no stored result yet.
- * Both are GET only and change nothing. Responses are validated against the shared
+ * Both are GET only and change no portfolio, ledger, or alert data. The valuation
+ * behind a view can still call providers and append FX observation records (design:
+ * Gateway rule 9, known limitation). Responses are validated against the shared
  * contracts before they are sent, so the same bodies can be stored verbatim as the
  * recorded responses of the static replay.
  */

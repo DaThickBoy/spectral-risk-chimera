@@ -13,7 +13,7 @@ This write-up describes how Spectral Risk Chimera was built with Kiro for Kirowe
 | `.kiro/steering/architecture.md`    | TypeScript and ESM settings, module dependency rules, ports and injected clock, configuration without defaults for financial settings, no hardcoded credentials                                                                              |
 | `.kiro/steering/ui-guidelines.md`   | Dashboard rules: dark design tokens, tabular numbers with units, four separate risk panels, status badges, no calculations in components, accessibility                                                                                      |
 
-No agent hooks, MCP servers, or custom agents were used for this project. The `.kiro/hooks/` folder is empty.
+No agent hooks, MCP servers, or custom agents are configured in this repository. The committed `.kiro/` directory contains only `specs/` and `steering/`.
 
 ## Spec-driven development
 

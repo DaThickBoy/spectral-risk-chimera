@@ -6,8 +6,11 @@ export {
   createApiServer,
   listenApiServer,
 } from './server.js';
-export type { ApiRoutes, ApiServerOptions, ListenOptions } from './server.js';
+export type { ApiRoutes, ApiServerOptions, ListenOptions, ListenRefusedReason } from './server.js';
 export type { AuthGuard } from './auth.js';
+export { ALLOWED_ORIGINS_INVALID, canonicalOrigin, isAllowedOrigin, parseAllowedOrigins } from './origin.js';
+export { installRequestGuard, isAllowedHost } from './requestGuard.js';
+export type { RequestGuardOptions } from './requestGuard.js';
 export { defineRoute, zodValidatorCompiler } from './validation.js';
 export type { RouteDefinition, RouteInput } from './validation.js';
 export { errorBody, sendError } from './errors.js';

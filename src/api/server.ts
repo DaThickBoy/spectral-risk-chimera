@@ -12,6 +12,13 @@
  *   configuration key for them (Gateway rule 1).
  * - Routes are registered by the caller through `routes`; the composition root
  *   that wires real services is deferred.
+ * - `requestGuard` (Gateway rule 9) installs the Host and Origin guard of
+ *   `requestGuard.ts` right after the correlation-id hook, before rate limiting,
+ *   body parsing, plugins, and routes. It is mandatory for listening:
+ *   `listenApiServer` refuses an instance that was not built with a valid guard
+ *   (`ListenRefusedError`, reason `REQUEST_GUARD_MISSING`). An unguarded
+ *   instance can still be built for isolated `inject()` tests, which never
+ *   listen. The guard does not replace authentication (OD-7).
  */
 import fastifyMultipart from '@fastify/multipart';
 import { fastify } from 'fastify';
@@ -22,6 +29,8 @@ import type { AuthGuard } from './auth.js';
 import { installErrorHandling } from './errors.js';
 import { installRateLimiting } from './rateLimit.js';
 import type { RateLimits } from './rateLimit.js';
+import { installRequestGuard } from './requestGuard.js';
+import type { RequestGuardOptions } from './requestGuard.js';
 import { multipartOptions } from './uploads.js';
 import type { UploadLimits } from './uploads.js';
 import { zodValidatorCompiler } from './validation.js';
@@ -44,7 +53,15 @@ export interface ApiServerOptions {
   readonly routes?: readonly ApiRoutes[];
   /** Type-only in version 1 (OD-7); never permits a non-loopback host. */
   readonly authGuard?: AuthGuard;
+  /**
+   * Host and Origin guard (Gateway rule 9). Required for `listenApiServer`; only
+   * `inject()` tests may omit it. The composition root always supplies it.
+   */
+  readonly requestGuard?: RequestGuardOptions;
 }
+
+/** Instances built with a successfully installed request guard (Gateway rule 9). */
+const guardedServers = new WeakSet<FastifyInstance>();
 
 export interface ListenOptions {
   readonly host: string;
@@ -52,8 +69,14 @@ export interface ListenOptions {
   readonly port: number;
 }
 
+/** Why `listenApiServer` refused: a non-loopback host (rule 2) or no request guard (rule 9). */
+export type ListenRefusedReason = 'HOST_NOT_LOOPBACK' | 'REQUEST_GUARD_MISSING';
+
 export class ListenRefusedError extends Error {
-  constructor(message: string) {
+  constructor(
+    readonly reason: ListenRefusedReason,
+    message: string,
+  ) {
     super(message);
     this.name = 'ListenRefusedError';
   }
@@ -82,6 +105,11 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-correlation-id', request.id);
   });
+  // Gateway rule 9: Host and Origin first, so a refused request takes no rate-limit token.
+  if (options.requestGuard !== undefined) {
+    installRequestGuard(app, options.requestGuard); // throws for an invalid origin list
+    guardedServers.add(app);
+  }
   // Task 4.3: before body parsing, so a limited request costs no parsing.
   installRateLimiting(app, options.rateLimits, options.clock);
   // Task 4.4: multipart parsing for upload routes only (one file, capped size).
@@ -96,15 +124,26 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   return app;
 }
 
-/** Listens on `127.0.0.1` only. Returns the bound address. */
+/**
+ * Listens on `127.0.0.1` only, and only for an instance built by `createApiServer`
+ * with a request guard. Checks run in a fixed order before anything is bound:
+ * host (rule 2), port, then the guard (rule 9). Returns the bound address.
+ */
 export async function listenApiServer(app: FastifyInstance, options: ListenOptions): Promise<string> {
   if (options.host !== LOOPBACK_HOST) {
     throw new ListenRefusedError(
+      'HOST_NOT_LOOPBACK',
       `Listening is permitted only on ${LOOPBACK_HOST} until authentication is decided (OD-7).`,
     );
   }
   if (!Number.isInteger(options.port) || options.port < 0 || options.port > 65_535) {
     throw new TypeError('port must be an integer from 0 to 65535.');
+  }
+  if (!guardedServers.has(app)) {
+    throw new ListenRefusedError(
+      'REQUEST_GUARD_MISSING',
+      'Listening requires a server built with the Host and Origin request guard (Gateway rule 9).',
+    );
   }
   return app.listen({ host: LOOPBACK_HOST, port: options.port });
 }

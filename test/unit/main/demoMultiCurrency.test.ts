@@ -644,7 +644,11 @@ describe('read-only dashboard routes (17.1 to 17.3) on the committed demo config
     const s = await startCommitted(FRIDAY_AFTER_PUBLICATION);
     for (const route of ['/dashboard', VIEW(MULTI)]) {
       for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
-        const response = await fetch(`${s.running.address}${route}`, { method });
+        // Without an allowed Origin the request guard refuses first (Gateway rule 9) ...
+        const refused = await fetch(`${s.running.address}${route}`, { method });
+        expect(refused.status, `${method} ${route} without Origin`).toBe(403);
+        // ... and with one, the dashboard still has no write route.
+        const response = await fetch(`${s.running.address}${route}`, { method, headers: { origin: ORIGIN } });
         expect(response.status, `${method} ${route}`).toBe(404);
       }
     }

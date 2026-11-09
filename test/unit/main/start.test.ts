@@ -179,9 +179,10 @@ describe('DEMO fixture mode: start and graceful stop on a temporary database', (
     expect(stored.ok).toBe(true);
     expect(running.app.components.seriesStore.latestFor('DEMO-A', 'REAL').ok).toBe(false);
 
+    // State-changing requests carry an allowed Origin (Gateway rule 9).
     const created = await fetch(`${running.address}/portfolios`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', origin: ORIGIN },
       body: JSON.stringify({ id: 'pf-demo', base_currency: 'USD', cash: '0' }),
     });
     expect(created.status).toBe(201);
@@ -190,7 +191,7 @@ describe('DEMO fixture mode: start and graceful stop on a temporary database', (
     const { headers, payload } = multipart([{ name: 'file', filename: 'trades.csv', content: csv }]);
     const imported = await fetch(`${running.address}/portfolios/pf-demo/imports`, {
       method: 'POST',
-      headers,
+      headers: { ...headers, origin: ORIGIN },
       body: payload,
     });
     expect(imported.status).toBe(201);
