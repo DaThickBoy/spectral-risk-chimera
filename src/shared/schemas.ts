@@ -51,6 +51,25 @@ export const FilingRiskScoreSchema = UnitIntervalDecimalString.transform(
   (value): FilingRiskScore => value as FilingRiskScore,
 );
 
+/**
+ * Printable ASCII (U+0020 to U+007E), first and last character not a space. A value
+ * that fails (empty, whitespace-only, surrounding spaces, control or non-ASCII
+ * characters) is rejected, never trimmed or otherwise normalized.
+ */
+const METHOD_TEXT = /^[\x21-\x7E](?:[\x20-\x7E]*[\x21-\x7E])?$/;
+
+/** Analysis method name (task 21.1): 1 to 64 characters. */
+export const AnalysisMethodName = z
+  .string()
+  .max(64, { message: 'must be at most 64 characters' })
+  .regex(METHOD_TEXT, { message: 'must be printable ASCII without surrounding whitespace' });
+
+/** Analysis method version (task 21.1): 1 to 32 characters. */
+export const AnalysisMethodVersion = z
+  .string()
+  .max(32, { message: 'must be at most 32 characters' })
+  .regex(METHOD_TEXT, { message: 'must be printable ASCII without surrounding whitespace' });
+
 function isCalendarDate(text: string): boolean {
   const [y, m, day] = text.split('-').map((part) => Number.parseInt(part, 10));
   if (y === undefined || m === undefined || day === undefined) {
@@ -80,3 +99,18 @@ export const Iso4217Code = z
   .string()
   .regex(/^[A-Z]{3}$/, { message: 'expected a three-letter ISO 4217 code' })
   .refine(isKnownCurrency, { message: 'unknown ISO 4217 currency code' });
+
+/**
+ * The fixed ticker pattern (R28.7, approved 2026-11-08; not configurable): an
+ * upper-case letter or digit, then up to 14 upper-case letters, digits, `.`, or
+ * `-`. Used by every boundary that accepts a ticker (CSV and FIX import,
+ * sentiment). Nothing is normalized: no trimming and no case folding; a
+ * mismatch is `INVALID_TICKER`.
+ */
+export const TICKER_PATTERN = /^[A-Z0-9][A-Z0-9.-]{0,14}$/;
+
+export const TickerSchema = z.string().regex(TICKER_PATTERN, { message: 'INVALID_TICKER' });
+
+export function isTicker(value: unknown): value is string {
+  return typeof value === 'string' && TICKER_PATTERN.test(value);
+}
