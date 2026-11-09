@@ -103,7 +103,8 @@ describe('repository coverage (runs as part of npm test)', () => {
   it('every requirement R1 to R35 has a referencing test', () => {
     const report = checkRepositoryCoverage(REPO_ROOT);
     expect(report.uncovered, formatReport(report)).toEqual([]);
-    // Requirements whose only tests are Blocked by open decisions (R2: OD-9 FIX; R23: OD-2 hardware).
-    expect(report.blockedOnly).toEqual([2, 23]);
+    // Requirements whose only tests are Blocked by open decisions (R2: OD-9 FIX). R23 is covered since
+    // task 12.4: the compiled risk worker test validates R23.4 (VaR outside the UI rendering path).
+    expect(report.blockedOnly).toEqual([2]);
   });
 });
