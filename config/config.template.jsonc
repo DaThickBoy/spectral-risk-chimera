@@ -65,12 +65,23 @@
     "maxReturnGapDays": null       // OD-6: proposed 5
   },
 
-  // Base currency and FX (R30). Operator decisions; no open decision applies to
-  // the currencies themselves.
+  // Base currency and FX (R30). Operator decisions.
+  // DR-FX-1 (requirements, Configuration policy 2) conditionally approves
+  // fx.baseCurrency "EUR" with fx.provider "ECB". Both take effect for real use
+  // only after OD-5 is resolved (legal confirmation for real use); until then they
+  // are not approved baseline values and stay out of this template's values. The
+  // fx.ecb.* operational settings (timeoutMs, maxResponseBytes, cacheMaxEntries)
+  // are omitted: their provisional defaults apply (OD-6). Never mix
+  // risk results or snapshots across base currencies without a configuration-
+  // version compatibility check.
   "fx": {
-    "baseCurrency": null,          // operator: ISO 4217 code, for example "USD"
+    "baseCurrency": null,          // operator: ISO 4217 code; DR-FX-1 conditionally approves "EUR" (effective after OD-5)
     "supportedCurrencies": null,   // operator: list of ISO 4217 codes including the base currency
-    "maxRateAgeSeconds": null      // OD-6: proposed 86400
+    "maxRateAgeSeconds": null,     // OD-6: proposed 86400 (see the requirements: does not cover weekends for daily ECB rates)
+    // "FIXTURE" (DEMO rates, development and tests) or "ECB" (requires baseCurrency "EUR").
+    // The ECB route is approved for the Kiroween hackathon demo only (decision H2); DR-FX-1
+    // is not yet effective for real use, so no value is filled in here.
+    "provider": null               // OD-5: operator choice; DR-FX-1 conditionally approves "ECB"
   },
 
   // SEC filing risk freshness (R31). Unresolved.

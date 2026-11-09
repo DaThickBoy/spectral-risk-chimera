@@ -14,6 +14,21 @@ const EMAIL_PATTERN = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 export const EnvSchema = z.object({
   /** Path of the runtime configuration file. The template is never accepted. */
   SRC_CONFIG_FILE: z.string().min(1).optional(),
+  /**
+   * Path of the SQLite database file (OD-12). Production start-up refuses to run without a
+   * valid path; there is no in-memory fallback. `:memory:`, `file:` URIs, and control
+   * characters are not accepted here (tests open `:memory:` explicitly).
+   */
+  SRC_DATABASE_FILE: z
+    .string()
+    .min(1)
+    .refine((value) => value !== ':memory:' && !value.toLowerCase().startsWith('file:'), {
+      message: 'must be a file path, not :memory: or a file: URI',
+    })
+    .refine((value) => ![...value].some((char) => (char.codePointAt(0) ?? 0) < 0x20), {
+      message: 'must not contain control characters',
+    })
+    .optional(),
   /** SEC EDGAR User-Agent, including a contact email (personal data). */
   SEC_USER_AGENT: z
     .string()

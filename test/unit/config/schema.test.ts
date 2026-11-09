@@ -26,8 +26,8 @@ describe('schema structure', () => {
     expect([...configLeafSchemas().keys()].sort()).toEqual([...CONFIG_KEYS].sort());
   });
 
-  it('has 24 class F keys, none with a default', () => {
-    expect(FINANCIAL_KEYS).toHaveLength(24);
+  it('has 25 class F keys, none with a default', () => {
+    expect(FINANCIAL_KEYS).toHaveLength(25);
     const leaves = configLeafSchemas();
     for (const key of FINANCIAL_KEYS) {
       const leaf = leaves.get(key);
@@ -66,12 +66,51 @@ describe('schema structure', () => {
     });
   });
 
+  it('gives the provider resilience settings their documented defaults (task 8.2)', () => {
+    const parsed = ConfigSchema.parse(completeTestConfig());
+    expect(parsed.provider).toEqual({
+      maxRetries: 3,
+      timeoutMs: 10_000,
+      backoff: { baseMs: 250, maxMs: 10_000 },
+      circuit: { failureThreshold: 5, openMs: 60_000 },
+      retryAfter: { maxMs: 600_000 },
+    });
+  });
+
+  it.each([
+    ['provider.retryAfter.maxMs', 1, 0],
+    ['provider.retryAfter.maxMs', 86_400_000, -1],
+    ['provider.retryAfter.maxMs', 600_000, 600.5],
+    ['provider.timeoutMs', 5000, 0],
+    ['provider.timeoutMs', 1, 1.5],
+    ['provider.backoff.baseMs', 100, 0],
+    ['provider.backoff.maxMs', 20_000, -1],
+    ['provider.circuit.failureThreshold', 1, 0],
+    ['provider.circuit.openMs', 1, 0],
+  ] as const)('%s accepts %j and rejects %j', (key, good, bad) => {
+    expect(valid(withKey(completeTestConfig(), key, good))).toBe(true);
+    expect(valid(withKey(completeTestConfig(), key, bad))).toBe(false);
+  });
+
+  it('requires provider.backoff.baseMs <= provider.backoff.maxMs', () => {
+    const equal = withKey(
+      withKey(completeTestConfig(), 'provider.backoff.baseMs', 500),
+      'provider.backoff.maxMs',
+      500,
+    );
+    expect(valid(equal)).toBe(true);
+    expect(valid(withKey(completeTestConfig(), 'provider.backoff.baseMs', 20_000))).toBe(false);
+  });
+
   it('flags the provisional operational defaults (OD-6)', () => {
     const provisional = CONFIG_KEYS.filter((key) => keyMeta(key).provisional === true).sort();
     expect(provisional).toEqual([
       'alerts.cooldownSeconds',
       'alerts.severity.criticalRatio',
       'alerts.severity.highRatio',
+      'fx.ecb.cacheMaxEntries',
+      'fx.ecb.maxResponseBytes',
+      'fx.ecb.timeoutMs',
       'sec.item1a.minChars',
     ]);
   });

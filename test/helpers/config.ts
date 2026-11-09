@@ -13,7 +13,12 @@ export function completeTestConfig(): Record<string, unknown> {
     adjustment: { bearishThreshold: '-0.60', multiplier: '1.15' },
     sentiment: { maxAgeSeconds: 900, windowSeconds: 300, maxFutureSkewSeconds: 5 },
     marketData: { maxStalenessDays: 5, maxReturnGapDays: 5 },
-    fx: { baseCurrency: 'USD', supportedCurrencies: ['USD', 'EUR'], maxRateAgeSeconds: 86400 },
+    fx: {
+      baseCurrency: 'USD',
+      supportedCurrencies: ['USD', 'EUR'],
+      maxRateAgeSeconds: 86400,
+      provider: 'FIXTURE',
+    },
     filing: { maxAgeDays: 120 },
     alerts: {
       var: { thresholdPct: '10', metric: 'ADJUSTED' },
@@ -87,6 +92,7 @@ export const UNAVAILABLE_CONFIGURATION_FEATURES = {
     'fx.baseCurrency',
     'fx.supportedCurrencies',
     'fx.maxRateAgeSeconds',
+    'fx.provider',
     'recalc.minValueChangePct',
   ]),
   adjustedVaR: disabled(
