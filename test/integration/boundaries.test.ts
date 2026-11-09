@@ -1,6 +1,6 @@
 // AT-ARC-01, AT-ARC-02: dependency-cruiser fails seeded boundary violations, naming the
 // rule, and the real tree passes. Static part of Property 11 (Filing independence).
-// Validates: Requirements 11.5, 26.1, 26.2, 26.10
+// Validates: Requirements 8.6, 11.5, 26.1, 26.2, 26.10
 import { describe, expect, it } from 'vitest';
 import { repoPath, runNode } from '../helpers/repo.js';
 
@@ -48,6 +48,22 @@ describe('AT-ARC-01: domain and risk boundaries', () => {
 
   it('cross-module imports go through index.ts', () => {
     expect(has('cross-module-through-index', 'src/alerts/index.ts', 'src/risk/internal.ts')).toBe(true);
+  });
+});
+
+describe('AT-FIL-10 (static): filing and sentiment text stay in separate modules (R8.6)', () => {
+  it('nlp/ and sec/ must not import sentiment/', () => {
+    expect(has('filing-text-not-to-sentiment', 'src/nlp/usesSentiment.ts', 'src/sentiment/index.ts')).toBe(
+      true,
+    );
+    expect(has('filing-text-not-to-sentiment', 'src/sec/usesSentiment.ts', 'src/sentiment/index.ts')).toBe(
+      true,
+    );
+  });
+
+  it('sentiment/ must not import nlp/ or sec/', () => {
+    expect(has('sentiment-text-not-to-filing', 'src/sentiment/usesFiling.ts', 'src/nlp/index.ts')).toBe(true);
+    expect(has('sentiment-text-not-to-filing', 'src/sentiment/usesFiling.ts', 'src/sec/index.ts')).toBe(true);
   });
 });
 
