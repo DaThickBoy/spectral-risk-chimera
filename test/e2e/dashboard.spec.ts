@@ -379,6 +379,56 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
   }
 });
 
+test.describe('loss distribution layout', () => {
+  for (const portfolio of ['demo-eur-usd-gbp', 'demo-eur-only']) {
+    for (const viewport of [
+      { width: 1440, height: 1000 },
+      { width: 390, height: 844 },
+    ]) {
+      test(`${portfolio} at ${String(viewport.width)} px: chart and summary layout, disclosure, no overflow`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        await page.goto(`${BASE}?portfolio=${portfolio}`);
+        const chart = page.getByTestId('loss-chart');
+        const summary = page.getByTestId('loss-summary');
+        const details = page.getByTestId('loss-table-details');
+        await expect(summary).toContainText('VaR 95% marker at');
+        const c = await chart.boundingBox();
+        const s = await summary.boundingBox();
+        if (c === null || s === null) throw new Error('missing layout boxes');
+        if (viewport.width === 1440) {
+          // Two columns: the summary sits to the right of the chart, starting near its top.
+          expect(s.x).toBeGreaterThanOrEqual(c.x + c.width);
+          expect(s.y).toBeLessThan(c.y + c.height / 2);
+        } else {
+          // One column: the chart comes first, the summary below it.
+          expect(s.y).toBeGreaterThanOrEqual(c.y + c.height);
+        }
+        // The disclosure opens by keyboard and shows its hint and exact values.
+        await details.locator('summary').focus();
+        await page.keyboard.press('Enter');
+        await expect(details).toHaveAttribute('open', '');
+        await expect(page.locator('#loss-exact-hint')).toBeVisible();
+        await expect(
+          page.getByRole('region', { name: 'Exact loss distribution values, scrollable' }),
+        ).toBeVisible();
+        if (viewport.width === 1440) {
+          // Opened, it spans the card below the chart, so the bucket table gets the full width.
+          // Boxes are viewport-relative and opening can scroll, so both are measured afresh.
+          const d = await details.boundingBox();
+          const c2 = await chart.boundingBox();
+          if (d === null || c2 === null) throw new Error('missing disclosure box');
+          expect(d.y).toBeGreaterThanOrEqual(c2.y + c2.height);
+          expect(d.width).toBeGreaterThan(c2.width);
+        }
+        const overflow = await page.evaluate('document.documentElement.scrollWidth - window.innerWidth');
+        expect(overflow).toBeLessThanOrEqual(0);
+      });
+    }
+  }
+});
+
 test.describe('states', () => {
   test('stale and unavailable FX (test-only variant of the recorded view)', async ({ page }) => {
     const recorded = JSON.parse(

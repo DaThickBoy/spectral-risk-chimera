@@ -70,15 +70,33 @@ export function BaseVarPanel({ data }: { readonly data: View }): ReactElement {
             : ''}
         </p>
       ) : (
-        <dl className="facts">
-          <dt>Share of NAV (exact)</dt>
-          <dd className="num">{withUnit(base.value.percentOfNav, '%')}</dd>
-          <dt>
-            Raw quantile loss (exact)
-            <Help term="rawQuantile" />
-          </dt>
-          <dd className="num">{withUnit(base.value.rawQuantile, currency)}</dd>
-        </dl>
+        // Institutional redesign: the full-precision backend values (about 40 digits) stay exact
+        // and complete, one disclosure away, on one line each in a keyboard-scrollable region,
+        // instead of wrapping across the headline panel. Nothing is rounded in the browser
+        // (ui-guidelines §2, §9).
+        <details className="disclosure" data-testid="base-var-exact">
+          <summary>Exact values (share of NAV, raw quantile)</summary>
+          <p className="exact-hint" id="base-var-exact-hint">
+            Full precision, unrounded. Scroll sideways in the box to read each value.
+          </p>
+          <div
+            className="exact-values"
+            role="region"
+            aria-label="Exact Base VaR values, scrollable"
+            aria-describedby="base-var-exact-hint"
+            tabIndex={0}
+          >
+            <dl className="facts">
+              <dt>Share of NAV (exact)</dt>
+              <dd className="num">{withUnit(base.value.percentOfNav, '%')}</dd>
+              <dt>
+                Raw quantile loss (exact)
+                <Help term="rawQuantile" />
+              </dt>
+              <dd className="num">{withUnit(base.value.rawQuantile, currency)}</dd>
+            </dl>
+          </div>
+        </details>
       )}
       {base.lastValid !== null ? (
         <p className="last-valid">

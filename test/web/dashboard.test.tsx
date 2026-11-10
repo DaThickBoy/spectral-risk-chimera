@@ -244,19 +244,39 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
     const width = (container: HTMLElement, ticker: string) =>
       (row(container, ticker).querySelector('.allocation-bar') as HTMLElement | null)?.style.width;
 
-    it('one bar per position with the exact backend percentage, matching the table, DEMO labelled', async () => {
+    it('every position plotted: one composition bar plus a legend with the exact backend percentages', async () => {
       const { container } = await show();
       const chart = container.querySelector('[data-testid="allocation-chart"]') as HTMLElement;
       expect(text(chart)).toContain('Allocation by position');
       expect(text(chart)).toContain('DEMO');
-      expect(text(row(container, 'DEMO-EU'))).toBe('DEMO-EU40.20%');
-      expect(text(row(container, 'DEMO-UK'))).toBe('DEMO-UK29.74%');
-      expect(width(container, 'DEMO-EU')).toBe('40.2%');
-      expect(width(container, 'DEMO-US')).toBe('25.59%');
-      // The bars are decorative; the text carries the values for screen readers.
-      expect(row(container, 'DEMO-EU').querySelector('.allocation-track')?.getAttribute('aria-hidden')).toBe(
-        'true',
+      // Legend rows: position number, ticker, and the exact backend percentage as text.
+      expect(text(row(container, 'DEMO-EU'))).toBe('1DEMO-EU40.20%');
+      expect(text(row(container, 'DEMO-UK'))).toBe('2DEMO-UK29.74%');
+      // Segments use the same adapter widths, in backend order; the bar is decorative, and each
+      // segment carries its legend number so shade is never the only cue.
+      const composition = container.querySelector('[data-testid="allocation-composition"]') as HTMLElement;
+      expect(composition.getAttribute('aria-hidden')).toBe('true');
+      const segments = [...composition.children].map((s) => [
+        s.getAttribute('data-testid'),
+        (s as HTMLElement).style.width,
+      ]);
+      expect(segments).toEqual([
+        ['allocation-segment-DEMO-EU', '40.2%'],
+        ['allocation-segment-DEMO-UK', '29.74%'],
+        ['allocation-segment-DEMO-US', '25.59%'],
+      ]);
+      expect([...composition.children].map((s) => s.textContent)).toEqual(['1', '2', '3']);
+      // Each legend swatch matches its segment's shade class and number.
+      expect(row(container, 'DEMO-EU').querySelector('.swatch')?.className).toBe('swatch seq-1');
+      expect(row(container, 'DEMO-EU').querySelector('.swatch')?.textContent).toBe('1');
+      expect(chart.querySelector('.composition-legend')?.getAttribute('aria-label')).toBe(
+        'Allocation by position',
       );
+      expect(chart.querySelector('.allocation-bars')).toBeNull(); // no repeated per-position bars
+      // The unfilled remainder is explained in words, with no browser-computed figure.
+      const note = text(chart.querySelector('[data-testid="allocation-remainder-note"]') as HTMLElement);
+      expect(note).toBe('Unfilled: not a listed position, for example cash (see Cash in the summary)');
+      expect(note).not.toMatch(/\d+\.\d+\s*%/);
       // The positions table states the same values.
       const table = text(
         container
@@ -537,9 +557,17 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
     ]);
     const summary = text(container.querySelector('[data-testid="loss-summary"]') as HTMLElement);
     expect(summary).toContain('10 daily scenarios from returns ending 2026-10-23 to 2026-11-06 (UTC dates)');
-    expect(summary).toContain('in 4 buckets of 2.25 EUR (exact 2.25)');
-    expect(summary).toContain('marker: 6.55 EUR (raw quantile, unrounded)');
+    expect(summary).toContain('in 4 buckets of 2.25 EUR.');
+    expect(summary).toContain('VaR 95% marker at 6.55 EUR.'); // backend display text
     expect(summary).toContain('Scenarios with a larger loss than the marker: 1.');
+    // The exact, unrounded values sit in the disclosure, in a focusable scroll region.
+    const exact = container.querySelector('[data-testid="loss-exact"]') as HTMLElement;
+    expect(exact.closest('details')?.getAttribute('data-testid')).toBe('loss-table-details');
+    expect(exact.getAttribute('role')).toBe('region');
+    expect(exact.getAttribute('tabindex')).toBe('0');
+    expect(text(exact)).toBe(
+      'VaR 95% marker: raw quantile (exact, unrounded)6.55 EURBucket width (exact)2.25 EUR',
+    );
   });
 
   it('unavailable: the reason and explanation only; no chart, no table, no zero bars', async () => {
@@ -710,7 +738,7 @@ describe('public-site review fixes', () => {
     const details = loss.querySelector('[data-testid="loss-table-details"]');
     expect(details).toBeInstanceOf(HTMLDetailsElement);
     expect((details as HTMLDetailsElement).open).toBe(false);
-    expect(details?.querySelector('summary')?.textContent).toBe('Exact bucket table (4 buckets)');
+    expect(details?.querySelector('summary')?.textContent).toBe('Exact values and bucket table (4 buckets)');
     expect(details?.querySelector('[data-testid="loss-table"]')).not.toBeNull();
     // Outside the disclosure: the chart (with its description) and the text summary.
     expect(details?.contains(loss.querySelector('[data-testid="loss-chart"]'))).toBe(false);
@@ -732,5 +760,122 @@ describe('public-site review fixes', () => {
     expect(css).toMatch(/\.summary-figure:has\(\.help-panel\) \{\s*flex: 1 1 100%;/);
     expect(css).toMatch(/\.summary-figure:has\(\.help-panel\) dt \{\s*display: block;/);
     expect(css).toMatch(/\.summary-figure dd \{\s*text-align: left;/);
+  });
+});
+
+describe('institutional redesign (presentation only)', () => {
+  it('Base VaR exact values: complete and unrounded, behind a closed disclosure in a focusable region', async () => {
+    const { container } = await show();
+    const panel = container.querySelector('[data-testid="panel-base-var"]') as HTMLElement;
+    const details = panel.querySelector('[data-testid="base-var-exact"]') as HTMLDetailsElement;
+    expect(details).toBeInstanceOf(HTMLDetailsElement);
+    expect(details.open).toBe(false);
+    expect(details.querySelector('summary')?.textContent).toBe('Exact values (share of NAV, raw quantile)');
+    const region = details.querySelector('.exact-values') as HTMLElement;
+    expect(region.getAttribute('role')).toBe('region');
+    expect(region.getAttribute('tabindex')).toBe('0');
+    expect(region.getAttribute('aria-label')).toBe('Exact Base VaR values, scrollable');
+    // A visible hint describes the scroll, and the region is described by it.
+    expect(region.getAttribute('aria-describedby')).toBe('base-var-exact-hint');
+    expect(details.querySelector('#base-var-exact-hint')?.textContent).toContain('Scroll sideways');
+    // The exact backend text, character for character: nothing is rounded or truncated.
+    expect(text(region)).toContain('0.5545977964722801352876283961402434634723 %');
+    // The headline figure stays the backend display text, outside the disclosure.
+    expect(details.contains(panel.querySelector('[data-testid="base-var-value"]'))).toBe(false);
+    expect(panel.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('124.10 EUR');
+  });
+
+  it('group labels are plain text between the groups, never headings', async () => {
+    const { container } = await show();
+    const labels = [...container.querySelectorAll('main > .eyebrow')].map((e) => [e.tagName, e.textContent]);
+    expect(labels).toEqual([
+      ['P', 'Risk analysis'],
+      ['P', 'Portfolio'],
+      ['P', 'Scenario distribution'],
+      ['P', 'Currency and FX'],
+    ]);
+    // Each label sits directly before its group.
+    const next = (label: string) =>
+      [...container.querySelectorAll('main > .eyebrow')].find((e) => e.textContent === label)
+        ?.nextElementSibling;
+    expect(next('Risk analysis')?.classList.contains('panels')).toBe(true);
+    expect(next('Portfolio')?.getAttribute('aria-labelledby')).toBe('positions-title');
+    expect(next('Scenario distribution')?.getAttribute('data-testid')).toBe('loss-distribution');
+    expect(next('Currency and FX')?.getAttribute('aria-labelledby')).toBe('ccy-title');
+  });
+
+  it('allocation shades: dark position numbers reach 4.5:1 on every shade; shades reach 3:1 on panels', () => {
+    const hex = (name: string): string => {
+      const m = new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i').exec(css);
+      if (m?.[1] === undefined) throw new Error(`token ${name} missing`);
+      return m[1];
+    };
+    // WCAG relative luminance; colour arithmetic only (not financial values).
+    const lum = (h: string): number =>
+      [1, 3, 5]
+        .map((i) => Number.parseInt(h.slice(i, i + 2), 16) / 255)
+        .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+        .reduce((sum, c, i) => sum + c * ([0.2126, 0.7152, 0.0722][i] ?? 0), 0);
+    const ratio = (a: string, b: string): number => {
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    for (let i = 1; i <= 6; i += 1) {
+      const shade = hex(`chart-seq-${String(i)}`);
+      expect(ratio(hex('chart-seq-ink'), shade), `ink on seq-${String(i)}`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(shade, hex('color-panel')), `seq-${String(i)} on panel`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('the stylesheet keeps exact rates on one line and layers surfaces with tokens only', () => {
+    expect(css).toMatch(/\.rate \{[^}]*white-space: nowrap;/);
+    expect(css).not.toMatch(/\.rate \{[^}]*overflow-wrap: anywhere/);
+    expect(css).toMatch(/\.exact-values \.facts dd \{[^}]*white-space: nowrap;/);
+    expect(css).toMatch(/\.section,\s*\.panel:not\(\.panel-primary\) \{[^}]*var\(--color-border-subtle\)/);
+    expect(css).toMatch(/\.summary-primary \+ \.summary-figure:not\(\.summary-primary\) \{[^}]*border-left/);
+    // Teal stays interaction-only: no accent in the redesign block's data or surface rules.
+    const block = css.slice(css.indexOf('Institutional redesign.'), css.indexOf('/* Responsive layout */'));
+    expect(block).not.toMatch(/--color-accent/);
+  });
+});
+
+describe('loss distribution layout (final refinement)', () => {
+  it('reading order is chart, then summary, then the disclosure; no value is duplicated', async () => {
+    const { container } = await show();
+    const layout = container.querySelector('[data-testid="loss-layout"]') as HTMLElement;
+    expect([...layout.children].map((c) => c.getAttribute('data-testid'))).toEqual([
+      'loss-main',
+      'loss-side',
+      'loss-table-details',
+    ]);
+    const main = layout.querySelector('[data-testid="loss-main"]') as HTMLElement;
+    expect(main.querySelector('[data-testid="loss-chart"]')).not.toBeNull();
+    expect(main.querySelector('.legend')).not.toBeNull();
+    const side = layout.querySelector('[data-testid="loss-side"]') as HTMLElement;
+    expect(side.querySelector('[data-testid="loss-summary"]')).not.toBeNull();
+    // The concise marker text appears once, from the backend display field.
+    expect(text(layout).split('VaR 95% marker at 6.55 EUR').length - 1).toBe(1);
+  });
+
+  it('the loss disclosure has the same visible scroll hint and description as the Base VaR one', async () => {
+    const { container } = await show();
+    const details = container.querySelector('[data-testid="loss-table-details"]') as HTMLDetailsElement;
+    const hint = details.querySelector('#loss-exact-hint') as HTMLElement;
+    expect(hint.className).toBe('exact-hint');
+    expect(hint.textContent).toBe(
+      'Full precision, unrounded. Scroll sideways in the boxes to read each value and the bucket table.',
+    );
+    const region = details.querySelector('[data-testid="loss-exact"]') as HTMLElement;
+    expect(region.getAttribute('aria-describedby')).toBe('loss-exact-hint');
+    // The hint describes one region only, so it is not announced twice.
+    expect(container.querySelectorAll('[aria-describedby="loss-exact-hint"]')).toHaveLength(1);
+  });
+
+  it('the stylesheet: one column by default, two from 1100 px, an opened disclosure spans the card', () => {
+    expect(css).toMatch(/\.loss-layout \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\);/);
+    expect(css).toMatch(
+      /@media \(min-width: 1100px\) \{\s*\.loss-layout \{\s*grid-template-columns: minmax\(600px, 800px\) minmax\(16rem, 1fr\);/,
+    );
+    expect(css).toMatch(/\.loss-details\[open\] \{\s*grid-column: 1 \/ -1;/);
   });
 });
