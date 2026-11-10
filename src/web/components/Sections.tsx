@@ -23,8 +23,11 @@ export function OverviewSection({ data }: { readonly data: View }): ReactElement
       <h2 id="overview-title">
         Portfolio overview <span className="muted-inline">· base currency {data.view.baseCurrency}</span>
       </h2>
-      <p className="badges">
+      <p className="badges" data-testid="overview-badges">
         <Badge tone={toneOf(data.view.exposure.status)} label={codeLabel(data.view.exposure.status)} />
+        {data.dataMode === 'DEMO' ? (
+          <Badge tone="demo" label="DEMO" title="Computed from DEMO fixture data" />
+        ) : null}
       </p>
       <dl className="facts facts-grid">
         {rows.map(([label, value]) => (
@@ -44,7 +47,13 @@ export function CurrencyExposureSection({ data }: { readonly data: View }): Reac
   return (
     <section className="section" aria-labelledby="ccy-title">
       <h2 id="ccy-title">Currency exposure</h2>
-      <div className="table-wrap">
+      {data.dataMode === 'DEMO' ? (
+        <p className="badges" data-testid="ccy-badges">
+          <Badge tone="demo" label="DEMO" title="Computed from DEMO fixture data" />
+        </p>
+      ) : null}
+      {/* Focusable so keyboard users can scroll the table on narrow screens (WCAG 2.1.1). */}
+      <div className="table-wrap" role="region" aria-label="Currency exposure table, scrollable" tabIndex={0}>
         <table>
           <caption>Market value in {currency} by instrument currency</caption>
           <thead>
@@ -79,7 +88,8 @@ export function FxSection({ data }: { readonly data: View }): ReactElement {
   return (
     <section className="section" aria-labelledby="fx-title">
       <h2 id="fx-title">FX rates used</h2>
-      <div className="table-wrap">
+      {/* Focusable so keyboard users can scroll the table on narrow screens (WCAG 2.1.1). */}
+      <div className="table-wrap" role="region" aria-label="FX rates table, scrollable" tabIndex={0}>
         <table>
           <caption>Rate(X/{data.view.baseCurrency}): units of base currency per one unit of X</caption>
           <thead>
@@ -198,9 +208,13 @@ export function PositionsSection({ data }: { readonly data: View }): ReactElemen
   return (
     <section className="section" aria-labelledby="positions-title">
       <h2 id="positions-title">Positions and allocation</h2>
-      <div className="table-wrap">
+      {/* Focusable so keyboard users can scroll the table on narrow screens (WCAG 2.1.1). */}
+      <div className="table-wrap" role="region" aria-label="Positions table, scrollable" tabIndex={0}>
         <table>
-          <caption>Signed quantities, latest prices, and values in {currency}</caption>
+          <caption>
+            Signed quantities, latest prices, and values in {currency}, converted at the rates listed in “FX
+            rates used” (published or derived as marked there)
+          </caption>
           <thead>
             <tr>
               <th scope="col">Ticker</th>

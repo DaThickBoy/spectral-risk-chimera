@@ -66,6 +66,12 @@ export type {
   DashboardViewResponse,
 } from './dashboard.js';
 export {
+  LOSS_DISTRIBUTION_UNAVAILABLE_REASONS,
+  LossBucketSchema,
+  LossDistributionSchema,
+} from './lossDistribution.js';
+export type { LossBucket, LossDistribution } from './lossDistribution.js';
+export {
   AlertIdParamsSchema,
   AlertIdSchema,
   AlertItemSchema,

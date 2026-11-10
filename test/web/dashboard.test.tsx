@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../../src/web/App.tsx';
+import { DashboardViewResponseSchema } from '../../src/shared/apiContracts/index.js';
 import { percentText } from '../../src/web/format.ts';
 import { OD1_TEXT, demoIndex, fxProblemView, multiCurrencyView } from './fixtures.js';
 import { memorySource, render, settle, text } from './render.js';
@@ -78,6 +79,82 @@ describe('panels and data mode (AT-DSH-01, AT-DSH-15)', () => {
     expect(bar).toContain('2026-11-06 16:00 UTC');
     expect(bar).toContain('CURRENT');
     expect(text(container)).toContain('DEMO DATA: prices and history are deterministic fixtures');
+  });
+});
+
+describe('panel times, provenance labels, and DEMO badges (ui-guidelines 3 and 4)', () => {
+  const panelText = (container: HTMLElement, id: string): string =>
+    text(container.querySelector(`#${id}-title`)?.closest('section') as HTMLElement);
+
+  it('every risk panel header states its parameters and its time', async () => {
+    const { container } = await show();
+    expect(panelText(container, 'base-var')).toContain(
+      '1 day · 95% · Historical Simulation · as of 2026-11-06',
+    );
+    expect(panelText(container, 'adjusted-var')).toContain('1 day · 95% · as of 2026-11-06');
+    expect(panelText(container, 'sentiment')).toContain(
+      'Sentiment index, -1 (bearish) to +1 (bullish) · as of 2026-11-06 16:00 UTC',
+    );
+    expect(panelText(container, 'filing')).toContain(
+      'Filing risk score, 0 (low) to 1 (high) · as of \u2014 (not configured)',
+    );
+  });
+
+  it('a sentiment value without an observation shows "—" and no basis or observation time', async () => {
+    const { container } = await show();
+    const row = text(container.querySelector('[data-testid="sentiment-DEMO-EU"]') as HTMLElement);
+    // textContent includes the badge's decorative (aria-hidden) icon glyph.
+    expect(row).toMatch(/^DEMO-EU \u2014 .?UNAVAILABLE$/);
+    expect(row).not.toMatch(/observed|observation|index/);
+  });
+
+  it('a DEMO latest observation is labelled DEMO, "not an aggregated index", with its observation time', async () => {
+    const base = multiCurrencyView();
+    const variant = DashboardViewResponseSchema.parse({
+      ...base,
+      view: {
+        ...base.view,
+        assets: base.view.assets.map((asset) =>
+          asset.ticker === 'DEMO-UK'
+            ? {
+                ...asset,
+                sentiment: {
+                  value: '-0.72',
+                  status: 'CURRENT',
+                  sourceKind: 'DEMO',
+                  observedAt: '2026-11-06T15:55:00.000Z',
+                  basis: 'LATEST_OBSERVATION',
+                },
+              }
+            : asset,
+        ),
+      },
+    });
+    const { container } = await show(variant);
+    const row = text(container.querySelector('[data-testid="sentiment-DEMO-UK"]') as HTMLElement);
+    expect(row).toContain('DEMO-UK -0.72');
+    expect(row).toContain('CURRENT');
+    expect(row).toContain('DEMO');
+    expect(row).toContain('latest observation, not an aggregated index · observed 2026-11-06 15:55 UTC');
+    // The value is displayed only: Adjusted VaR stays unavailable with its reason (H7).
+    const adjusted = container.querySelector('#adjusted-var-title')?.closest('section') as HTMLElement;
+    expect(adjusted.querySelector('[data-testid="adjusted-var-value"]')?.textContent).toBe('Unavailable');
+  });
+
+  it('DEMO data is labelled on the NAV, the overview, and the currency exposure', async () => {
+    const { container } = await show();
+    // textContent includes the badge's decorative (aria-hidden) icon glyph.
+    expect(text(container.querySelector('[data-testid="topbar-nav"]') as HTMLElement)).toMatch(
+      /^22375\.74 EUR .?DEMO$/,
+    );
+    expect(text(container.querySelector('[data-testid="overview-badges"]') as HTMLElement)).toContain('DEMO');
+    expect(text(container.querySelector('[data-testid="ccy-badges"]') as HTMLElement)).toContain('DEMO');
+  });
+
+  it('positions name the FX rates they were converted at', async () => {
+    const { container } = await show();
+    const caption = container.querySelector('#positions-title')?.closest('section')?.querySelector('caption');
+    expect(caption?.textContent).toMatch(/converted at the rates listed in “FX rates used”/);
   });
 });
 
@@ -215,6 +292,97 @@ describe('loading and error states', () => {
     select.dispatchEvent(new Event('change', { bubbles: true }));
     await settle();
     expect(source.calls).toContain('view:demo-eur-only');
+  });
+});
+
+describe('A2 loss distribution (ui-guidelines 5)', () => {
+  const section = (container: HTMLElement): HTMLElement =>
+    container.querySelector('[data-testid="loss-distribution"]') as HTMLElement;
+
+  it('sits after the positions and before the FX rates', async () => {
+    const { container } = await show();
+    const titles = [...container.querySelectorAll('main h2')].map((h) => h.id);
+    expect(titles.indexOf('loss-title')).toBe(titles.indexOf('positions-title') + 1);
+    expect(titles.indexOf('fx-title')).toBe(titles.indexOf('loss-title') + 1);
+  });
+
+  it('states the metric, parameters, calculation time, validity, and DEMO label', async () => {
+    const { container } = await show();
+    const heading = text(container.querySelector('#loss-title') as HTMLElement);
+    expect(heading).toBe(
+      'Loss distribution · Base VaR scenarios · 1 day · 95% · Historical Simulation · as of 2026-11-06 16:00 UTC',
+    );
+    const badges = text(container.querySelector('[data-testid="loss-badges"]') as HTMLElement);
+    expect(badges).toMatch(/CURRENT/);
+    expect(badges).toMatch(/DEMO/);
+  });
+
+  it('chart: accessible name and description, axis labels with units, legend, and the labelled VaR marker', async () => {
+    const { container } = await show();
+    const svg = container.querySelector('[data-testid="loss-chart"]') as SVGElement;
+    expect(svg.getAttribute('role')).toBe('img');
+    expect(svg.getAttribute('aria-labelledby')).toBe('loss-chart-title loss-chart-desc');
+    expect(svg.querySelector('#loss-chart-title')?.textContent).toBe(
+      'Base VaR scenario losses, 4 buckets, EUR',
+    );
+    expect(svg.querySelector('#loss-chart-desc')?.textContent).toContain(
+      'The VaR marker at 95% is 6.55 EUR. Scenarios with a larger loss: 1.',
+    );
+    const svgText = svg.textContent;
+    expect(svgText).toContain('Loss (EUR); negative values are gains');
+    expect(svgText).toContain('Scenarios (count)');
+    expect(svgText).toContain('-2.00 EUR');
+    expect(svgText).toContain('7.00 EUR');
+    expect(svgText).toContain('VaR 95% · 6.55 EUR');
+    const legend = text(section(container).querySelector('.legend') as HTMLElement);
+    expect(legend).toContain('Scenario losses per bucket');
+    expect(legend).toContain('VaR 95% (raw quantile)');
+  });
+
+  it('bars and tooltips use the exact backend strings; the marker sits at the backend position', async () => {
+    const { container } = await show();
+    const bars = [...container.querySelectorAll('[data-testid^="loss-bar-"]')];
+    expect(bars.map((b) => b.querySelector('title')?.textContent)).toEqual([
+      '-2 to 0.25 EUR (upper edge excluded): 3 scenarios',
+      '0.25 to 2.5 EUR (upper edge excluded): 2 scenarios',
+      '2.5 to 4.75 EUR (upper edge excluded): 2 scenarios',
+      '4.75 to 7 EUR (upper edge included): 3 scenarios',
+    ]);
+    // Plot 56..624 px, 4 slots of 142 px; heights from counts 3/2/2/3 over 180 px.
+    expect(bars.map((b) => b.getAttribute('height'))).toEqual(['180', '120', '120', '180']);
+    const marker = container.querySelector('[data-testid="loss-var-marker"]') as SVGElement;
+    expect(marker.getAttribute('x1')).toBe('595.6'); // 56 + 3.8 * 142
+    expect(marker.querySelector('title')?.textContent).toBe('VaR 95%: raw quantile 6.55 EUR');
+  });
+
+  it('the table lists every bucket with exact canonical edges, counts, and the marker bucket', async () => {
+    const { container } = await show();
+    const rows = [...container.querySelectorAll('[data-testid="loss-table"] tbody tr')].map((row) =>
+      [...row.children].map((cell) => cell.textContent),
+    );
+    expect(rows).toEqual([
+      ['1', '-2', '0.25', 'excluded', '3', ''],
+      ['2', '0.25', '2.5', 'excluded', '2', ''],
+      ['3', '2.5', '4.75', 'excluded', '2', ''],
+      ['4', '4.75', '7', 'included', '3', 'VaR 95% at 6.55'],
+    ]);
+    const summary = text(container.querySelector('[data-testid="loss-summary"]') as HTMLElement);
+    expect(summary).toContain('10 daily scenarios from returns ending 2026-10-23 to 2026-11-06 (UTC dates)');
+    expect(summary).toContain('in 4 buckets of 2.25 EUR (exact 2.25)');
+    expect(summary).toContain('marker: 6.55 EUR (raw quantile, unrounded)');
+    expect(summary).toContain('Scenarios with a larger loss than the marker: 1.');
+  });
+
+  it('unavailable: the reason and explanation only; no chart, no table, no zero bars', async () => {
+    const { container } = await show(fxProblemView());
+    const s = section(container);
+    expect(text(s)).toContain(
+      'Unavailable (BASE VAR UNAVAILABLE): Base VaR is unavailable (FX_UNAVAILABLE), so no scenario loss distribution is shown.',
+    );
+    expect(text(s.querySelector('[data-testid="loss-badges"]') as HTMLElement)).toMatch(/UNAVAILABLE/);
+    expect(s.querySelector('svg')).toBeNull();
+    expect(s.querySelector('table')).toBeNull();
+    expect(text(s)).not.toMatch(/\b0 scenarios|: 0\b/);
   });
 });
 

@@ -16,6 +16,8 @@ describe('CI workflow', () => {
   });
 
   it('runs every gate in order', () => {
+    // The secret-scan job also installs and builds, so the order is checked within `verify`.
+    const verify = workflow.slice(workflow.indexOf('  verify:'), workflow.indexOf('  e2e:'));
     const steps = [
       'npm ci',
       'npm run typecheck',
@@ -27,7 +29,7 @@ describe('CI workflow', () => {
     ];
     let last = -1;
     for (const step of steps) {
-      const index = workflow.indexOf(`run: ${step}`);
+      const index = verify.indexOf(`run: ${step}`);
       expect(index, step).toBeGreaterThan(last);
       last = index;
     }
@@ -76,5 +78,66 @@ describe('CI workflow', () => {
     expect(workflow).toMatch(/GITLEAKS_SHA256: [0-9a-f]{64}/);
     expect(workflow).toContain('sha256sum --check --strict');
     expect(workflow).toContain('--exit-code 1');
+  });
+
+  describe('A3: scans the built dashboard that GitHub Pages publishes', () => {
+    const job = workflow.slice(workflow.indexOf('  secret-scan:'), workflow.indexOf('  dependency-audit:'));
+    const bundleConfig = readFileSync(repoPath('.gitleaks-bundle.toml'), 'utf8');
+    const sourceConfig = readFileSync(repoPath('.gitleaks.toml'), 'utf8');
+    const pages = readFileSync(repoPath('.github', 'workflows', 'pages.yml'), 'utf8');
+    const scan =
+      '"${RUNNER_TEMP}/gitleaks" dir dist/web --config .gitleaks-bundle.toml --redact --no-banner --exit-code 1';
+
+    it('builds and records the replay, checks the bundle exists, then scans dist/web', () => {
+      const order = [
+        'run: npm ci',
+        'run: npm run build',
+        'run: npm run export:replay',
+        'test -s dist/web/index.html',
+        'test -s dist/web/replay/manifest.json',
+        scan,
+      ];
+      let last = job.indexOf('dir . --config .gitleaks.toml');
+      expect(last, 'source scan').toBeGreaterThan(-1);
+      for (const step of order) {
+        const index = job.indexOf(step);
+        expect(index, step).toBeGreaterThan(last);
+        last = index;
+      }
+      expect(job).not.toMatch(/continue-on-error|\|\| true|if:/);
+    });
+
+    it('L5: self-tests the bundle scan with a fake secret planted in a source map (sourcesContent)', () => {
+      const name = '- name: Self-test, the bundle scan detects a fake secret in a source map';
+      const step = job.slice(job.indexOf(name));
+      expect(job.indexOf(name)).toBeGreaterThan(job.indexOf(scan));
+      // A copy of the real bundle; the token goes into sourcesContent of a .js.map file.
+      expect(step).toContain('cp -R dist/web "${canary}/dist/web"');
+      expect(step).toContain("-name '*.js.map'");
+      expect(step).toContain('map.sourcesContent[0] +=');
+      // The same bundle config and flags as the real scan; the run must return exactly the leak code
+      // and report the planted token in the .map file.
+      expect(step).toContain('--config "${GITHUB_WORKSPACE}/.gitleaks-bundle.toml"');
+      expect(step).toContain('--redact --no-banner --exit-code 1');
+      expect(step).toContain('test "${code}" -eq 1');
+      expect(step).toContain('"RuleID": *"github-pat"');
+      expect(step).toContain('\\.js\\.map"');
+      // No real or literal token in the repository: the prefix is joined at run time.
+      expect(workflow).not.toMatch(/ghp_[A-Za-z0-9]{36}/);
+    });
+
+    it('scans the same directory that the Pages workflow uploads', () => {
+      expect(pages).toMatch(/^\s+path: dist\/web\r?$/m);
+    });
+
+    it('uses a bundle config with the default rules and no allowlist that could hide dist/', () => {
+      // The source config excludes dist/; reusing it would silently skip the whole bundle.
+      expect(sourceConfig).toContain("'''(^|/)dist/'''");
+      expect(bundleConfig).toMatch(/^useDefault = true\r?$/m);
+      const settings = bundleConfig
+        .split(/\r?\n/)
+        .filter((line) => line.trim() !== '' && !line.trimStart().startsWith('#'));
+      expect(settings).toEqual(['[extend]', 'useDefault = true']);
+    });
   });
 });

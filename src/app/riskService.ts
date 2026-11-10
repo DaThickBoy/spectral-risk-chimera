@@ -21,13 +21,16 @@
  *
  * `snapshot(portfolioId, hash)` returns the latest stored snapshot with that hash.
  * `recompute(snapshotId)` reruns the engine from a stored snapshot (R32.2).
+ * `scenarioLosses(portfolioId)` (Kiroween A2) returns the latest result's Base VaR scenario
+ * losses, recomputed from its verified snapshot, for the dashboard loss distribution. Nothing is
+ * stored, and the stored result and snapshot are unchanged.
  */
 import { z } from 'zod';
 import type { ConfigVersion } from '../config/index.js';
 import type { ReturnsBuilder } from '../marketdata/index.js';
 import { PersistenceError } from '../persistence/ports.js';
 import type { RiskResultRecord, SnapshotRecord, UnitOfWork } from '../persistence/ports.js';
-import { deriveValidity } from '../risk/index.js';
+import { deriveValidity, scenarioLosses } from '../risk/index.js';
 import type {
   AdjustedStatus,
   AdjustmentOutcome,
@@ -41,7 +44,7 @@ import type {
   VarFigure,
 } from '../risk/index.js';
 import { DecimalStringSchema, IsoDate, IsoUtcMillis, canonicalJson } from '../shared/index.js';
-import type { Clock, DecimalString, IdGenerator, Result } from '../shared/index.js';
+import type { Clock, Decimal, DecimalString, IdGenerator, Result } from '../shared/index.js';
 import type { PriceIssue, RiskInputBuilder, RiskPreconditionError } from './riskInputBuilder.js';
 import {
   AdjustmentOutcomeSchema,
@@ -132,10 +135,35 @@ export interface RiskService {
    */
   adjustmentDetail(portfolioId: string): AdjustmentDetail | undefined;
   snapshot(portfolioId: string, hash: string): SnapshotRecord | undefined;
+  /**
+   * Kiroween A2: the Base VaR scenario losses of the latest stored result, recomputed from its
+   * stored snapshot (hash and returns hash verified, R32.4), in date order. `undefined`
+   * without a result.
+   */
+  scenarioLosses(portfolioId: string): ScenarioLossesOutcome | undefined;
   recompute(
     snapshotId: string,
   ): Result<RiskResult, RecomputeError | { readonly code: 'NOT_FOUND'; readonly message: string }>;
 }
+
+export type ScenarioLossesOutcome =
+  | {
+      readonly status: 'OK';
+      /** `scenarioLosses(input)` (FR-5), unrounded, in date order. */
+      readonly losses: readonly Decimal[];
+      /** End dates of the first and last return in the scenario window. */
+      readonly firstDate: string;
+      readonly lastDate: string;
+      readonly confidence: DecimalString;
+      /** The recomputed raw Type 7 quantile, for the consistency check with the stored figure. */
+      readonly rawQuantile: DecimalString;
+      readonly snapshotHash: string;
+    }
+  /** The latest result has no snapshot (a precondition failure or no return matrix). */
+  | { readonly status: 'NO_SNAPSHOT' }
+  /** The recomputed result has no Base VaR. */
+  | { readonly status: 'BASE_VAR_UNAVAILABLE' }
+  | { readonly status: 'SNAPSHOT_RECOMPUTE_FAILED'; readonly code: string };
 
 // ---- Stored body (canonical JSON in risk_results.body) ----
 
@@ -460,6 +488,44 @@ export function createRiskService(deps: RiskServiceDependencies): RiskService {
           .filter((s) => s.portfolioId === portfolioId)
           .at(-1),
       ),
+
+    scenarioLosses: (portfolioId) => {
+      const latest = unitOfWork.run((tx) => tx.riskResults.listByPortfolio(portfolioId)).at(-1);
+      if (latest === undefined) {
+        return undefined;
+      }
+      const snapshotId = latest.snapshotId;
+      const stored = snapshotId === null ? undefined : unitOfWork.run((tx) => tx.snapshots.get(snapshotId));
+      if (stored === undefined || latest.snapshotHash === null) {
+        return { status: 'NO_SNAPSHOT' };
+      }
+      const outcome = recomputeFromSnapshot(stored, deps);
+      if (!outcome.ok) {
+        return { status: 'SNAPSHOT_RECOMPUTE_FAILED', code: outcome.error.code };
+      }
+      const { input, result } = outcome.value;
+      const dates = input.returns?.dates ?? [];
+      const firstDate = dates[0];
+      const lastDate = dates.at(-1);
+      if (
+        result.status !== 'OK' ||
+        result.baseVaR === null ||
+        result.confidence === null ||
+        firstDate === undefined ||
+        lastDate === undefined
+      ) {
+        return { status: 'BASE_VAR_UNAVAILABLE' };
+      }
+      return {
+        status: 'OK',
+        losses: scenarioLosses(input),
+        firstDate,
+        lastDate,
+        confidence: result.confidence,
+        rawQuantile: result.baseVaR.rawQuantile,
+        snapshotHash: latest.snapshotHash,
+      };
+    },
 
     recompute: (snapshotId) => {
       const stored = unitOfWork.run((tx) => tx.snapshots.get(snapshotId));

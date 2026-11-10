@@ -42,6 +42,65 @@ jobs:
           set -euo pipefail
           "${RUNNER_TEMP}/gitleaks" dir . --config .gitleaks.toml --redact --no-banner --exit-code 1
 
+      # Kiroween decision A3: also scan the built dashboard exactly as GitHub Pages publishes it
+      # (dist/web/ with the recorded replay). The source config above excludes dist/, so this
+      # scan uses .gitleaks-bundle.toml, which has no path allowlist. Offline: the replay is
+      # recorded from fixtures with the fixed reference clock; no live provider is called.
+      - name: Set up Node.js 24.22.1
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+
+      - name: Install from lockfile
+        run: npm ci
+
+      - name: Build backend and dashboard
+        run: npm run build
+
+      - name: Record the static replay
+        run: npm run export:replay
+
+      - name: Scan the published bundle (dist/web)
+        run: |
+          set -euo pipefail
+          # The scan must never pass because the bundle is missing.
+          test -s dist/web/index.html
+          test -s dist/web/replay/manifest.json
+          "${RUNNER_TEMP}/gitleaks" dir dist/web --config .gitleaks-bundle.toml --redact --no-banner --exit-code 1
+
+      # Self-test of the bundle scan (review item L5): a copy of the real bundle with a synthetic,
+      # GitHub-token-shaped string planted in the source map's sourcesContent must be reported, so the
+      # scan above can never pass merely because it does not read .map files. The string is assembled at
+      # run time and is not a credential; the original dist/web is not modified.
+      - name: Self-test, the bundle scan detects a fake secret in a source map
+        run: |
+          set -euo pipefail
+          canary="${RUNNER_TEMP}/bundle-canary"
+          rm -rf "${canary}"
+          mkdir -p "${canary}/dist"
+          cp -R dist/web "${canary}/dist/web"
+          map="$(find "${canary}/dist/web/assets" -name '*.js.map' | head -n 1)"
+          test -s "${map}"
+          fake="ghp_$(printf '%s' 'Zq7Xw2Lr9Tn4Vb6Ks1Hd8Mf3Pc5Jy0Ga2Ue7')"
+          node -e '
+            const fs = require("node:fs");
+            const [file, value] = process.argv.slice(1);
+            const map = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (!Array.isArray(map.sourcesContent) || map.sourcesContent.length === 0) process.exit(3);
+            map.sourcesContent[0] += `\nconst planted = "${value}";\n`;
+            fs.writeFileSync(file, JSON.stringify(map));
+          ' "${map}" "${fake}"
+          set +e
+          (cd "${canary}" && "${RUNNER_TEMP}/gitleaks" dir dist/web --config "${GITHUB_WORKSPACE}/.gitleaks-bundle.toml" \
+            --redact --no-banner --exit-code 1 --report-format json --report-path "${canary}/report.json")
+          code=$?
+          set -e
+          # Exactly the leak exit code, and the finding is the planted token in the .map file.
+          test "${code}" -eq 1
+          grep -q '"RuleID": *"github-pat"' "${canary}/report.json"
+          grep -q '\.js\.map"' "${canary}/report.json"
+
   # Task 25.3 (R26.5): npm audit on every change. Fails on high and critical findings;
   # lower severities are reported in the log without failing. All dependencies are
   # audited, including dev dependencies (no --omit). It reads package-lock.json, so

@@ -59,6 +59,7 @@ import { openApplicationDatabase } from './database.js';
 import { createDemoFixtures } from './demoFixtures.js';
 import type { DemoFixtures } from './demoFixtures.js';
 import { DEMO_PORTFOLIOS, seedDemoPortfolios } from './demoPortfolios.js';
+import { DemoSentimentFixture } from './demoSentiment.js';
 
 /** Provisional operational values (no configuration keys; OD-6). */
 export const PROVISIONAL_OPERATIONAL_VALUES = Object.freeze({
@@ -366,6 +367,19 @@ export async function startApplication(options: StartOptions): Promise<RunningAp
       ticker,
       stored: result?.ok === true,
       ...(result !== undefined && !result.ok ? { code: result.error.code } : {}),
+    });
+  }
+
+  // H9 (demo only, Kiroween A1): fixed DEMO sentiment observations for display, recorded before
+  // the portfolios are seeded so the first calculation sees them (and rejects them as DEMO).
+  const demoSentiment = new DemoSentimentFixture();
+  for (const observation of demoSentiment.observations()) {
+    const outcome = app.components.sentiment?.record(observation);
+    logger.info('start.demo_sentiment', {
+      provider: demoSentiment.name,
+      kind: demoSentiment.kind,
+      ticker: observation.ticker,
+      outcome: outcome ?? 'SENTIMENT_NOT_CONFIGURED',
     });
   }
 

@@ -3,7 +3,7 @@
 // Every figure is backend text; nothing is calculated here.
 import type { ReactElement, ReactNode } from 'react';
 import type { DashboardViewResponse } from '../../shared/apiContracts/index.js';
-import { MISSING, codeLabel, utcText, withUnit } from '../format.js';
+import { MISSING, codeLabel, confidencePct, utcText, withUnit } from '../format.js';
 import { Badge, toneOf } from './Badge.tsx';
 
 type View = DashboardViewResponse;
@@ -24,12 +24,6 @@ function Panel(props: {
     </section>
   );
 }
-
-const confidencePct = (confidence: string | null): string => {
-  // Text only: "0.95" -> "95%" by moving the decimal point; no number is parsed.
-  const match = confidence === null ? null : /^0\.(\d{2})$/.exec(confidence);
-  return match?.[1] === undefined ? (confidence ?? MISSING) : `${match[1]}%`;
-};
 
 export function BaseVarPanel({ data }: { readonly data: View }): ReactElement {
   const base = data.view.baseVaR;
@@ -85,7 +79,7 @@ export function AdjustedVarPanel({ data }: { readonly data: View }): ReactElemen
     <Panel
       id="adjusted-var"
       title="Sentiment-Adjusted VaR"
-      params={`1 day · ${confidencePct(data.view.confidence)}`}
+      params={`1 day · ${confidencePct(data.view.confidence)} · as of ${data.freshness.asOfDate ?? MISSING}`}
     >
       {adjusted.value === null ? (
         <>
@@ -121,18 +115,36 @@ export function AdjustedVarPanel({ data }: { readonly data: View }): ReactElemen
   );
 }
 
+/** What a displayed sentiment value is, from the backend `basis` (text only). */
+const SENTIMENT_BASIS: Readonly<Record<string, string>> = {
+  INDEX: 'aggregated index',
+  LATEST_OBSERVATION: 'latest observation, not an aggregated index',
+};
+
 export function SentimentPanel({ data }: { readonly data: View }): ReactElement {
   return (
-    <Panel id="sentiment" title="Market Sentiment" params="Sentiment index, -1 (bearish) to +1 (bullish)">
+    <Panel
+      id="sentiment"
+      title="Market Sentiment"
+      params={`Sentiment index, -1 (bearish) to +1 (bullish) · as of ${utcText(data.generatedAt)}`}
+    >
       <ul className="plain-list">
-        {data.view.assets.map((asset) => (
-          <li key={asset.ticker}>
-            <span className="ticker">{asset.ticker}</span>{' '}
-            <span className="num">{asset.sentiment.value ?? MISSING}</span>{' '}
-            <Badge tone={toneOf(asset.sentiment.status)} label={asset.sentiment.status} />
-            {asset.sentiment.sourceKind === 'DEMO' ? <Badge tone="demo" label="DEMO" /> : null}
-          </li>
-        ))}
+        {data.view.assets.map((asset) => {
+          const basis = SENTIMENT_BASIS[asset.sentiment.basis];
+          return (
+            <li key={asset.ticker} data-testid={`sentiment-${asset.ticker}`}>
+              <span className="ticker">{asset.ticker}</span>{' '}
+              <span className="num">{asset.sentiment.value ?? MISSING}</span>{' '}
+              <Badge tone={toneOf(asset.sentiment.status)} label={asset.sentiment.status} />
+              {asset.sentiment.sourceKind === 'DEMO' ? <Badge tone="demo" label="DEMO" /> : null}
+              {basis === undefined ? null : (
+                <span className="muted-block">
+                  {basis} · observed {utcText(asset.sentiment.observedAt)}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ul>
       <p className="caption">
         Scale: -1 bearish to +1 bullish. Shown separately from filing risk; never combined.
@@ -143,7 +155,11 @@ export function SentimentPanel({ data }: { readonly data: View }): ReactElement 
 
 export function FilingPanel({ data }: { readonly data: View }): ReactElement {
   return (
-    <Panel id="filing" title="SEC Filing Risk" params="Filing risk score, 0 (low) to 1 (high)">
+    <Panel
+      id="filing"
+      title="SEC Filing Risk"
+      params={`Filing risk score, 0 (low) to 1 (high) · as of ${MISSING} (not configured)`}
+    >
       <p className="metric metric-unavailable">{MISSING}</p>
       <p className="badges">
         <Badge tone="unavailable" label={codeLabel(data.filing.status)} />

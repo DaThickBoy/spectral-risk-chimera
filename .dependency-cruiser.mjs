@@ -72,8 +72,21 @@ export default {
         'web/ talks to the backend only through API contracts: from src/ it may import only the browser-safe ' +
         'shared API contract index (src/shared/apiContracts/index.ts), never a domain module (task 17.2).',
       severity: 'error',
-      from: { path: '^src/web/' },
+      from: { path: '^src/web/', pathNot: '^src/web/chartAdapter\\.ts$' },
       to: { path: '^src/', pathNot: ['^src/web/', '^src/shared/apiContracts/index\\.ts$'] },
+    },
+    {
+      name: 'web-chart-adapter-boundary',
+      comment:
+        'The chart adapter is the one presentation boundary (R4.4, architecture 4): besides the contract ' +
+        'index it may import only src/shared/decimal.ts, for toChartNumber (browser-safe; the contracts ' +
+        'already bundle it). ESLint restricts toChartNumber itself to this file.',
+      severity: 'error',
+      from: { path: '^src/web/chartAdapter\\.ts$' },
+      to: {
+        path: '^src/',
+        pathNot: ['^src/web/', '^src/shared/apiContracts/index\\.ts$', '^src/shared/decimal\\.ts$'],
+      },
     },
     {
       name: 'outer-layers-not-to-web',

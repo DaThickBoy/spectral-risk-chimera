@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import type { DashboardIndexResponse, DashboardViewResponse } from '../shared/apiContracts/index.js';
+import { LossDistributionSection } from './components/LossDistribution.tsx';
 import { AdjustedVarPanel, BaseVarPanel, FilingPanel, SentimentPanel } from './components/Panels.tsx';
 import {
   CurrencyExposureSection,
@@ -136,7 +137,8 @@ export function App({
         onReload={reload}
         data={data}
       />
-      <main id="main" aria-busy={view.status === 'loading'}>
+      {/* tabIndex -1: the skip link moves keyboard focus here, not only the scroll position. */}
+      <main id="main" tabIndex={-1} aria-busy={view.status === 'loading'}>
         {view.status === 'loading' ? (
           <div className="state state-loading" role="status">
             Loading portfolio data…
@@ -174,6 +176,7 @@ export function App({
               <CurrencyExposureSection data={data} />
             </div>
             <PositionsSection data={data} />
+            <LossDistributionSection data={data} />
             <FxSection data={data} />
           </>
         ) : null}

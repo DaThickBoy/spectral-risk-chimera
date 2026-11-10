@@ -27,7 +27,7 @@ function fakeFetch(files: Record<string, unknown>, calls: Call[]): Fetch {
 
 const SHA = 'a'.repeat(64);
 const manifest = (views: Record<string, string> = { 'demo-eur-usd-gbp': 'demo-eur-usd-gbp.json' }) => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   kind: 'DASHBOARD_REPLAY',
   recordedAt: '2026-11-06T16:00:02.000Z',
   note: 'Recorded DEMO responses.',
@@ -78,6 +78,32 @@ describe('replay source', () => {
     expect(view.ok && view.value.portfolioId).toBe('demo-eur-usd-gbp');
     expect(calls.every((c) => c.method === 'GET')).toBe(true);
     expect(calls.filter((c) => c.url.endsWith('manifest.json'))).toHaveLength(1); // cached
+  });
+
+  it('schema version 2: a version-1 manifest, or a version-1 view without lossDistribution, is refused', async () => {
+    const oldManifest = createReplaySource(
+      fakeFetch(
+        {
+          './replay/manifest.json': { ...manifest(), schemaVersion: 1 },
+          './replay/demo-eur-usd-gbp.json': multiCurrencyView(),
+        },
+        [],
+      ),
+    );
+    expect(await oldManifest.info()).toEqual({ ok: false, error: 'INVALID_RESPONSE' });
+
+    const v1Body: Record<string, unknown> = { ...multiCurrencyView(), schemaVersion: 1 };
+    delete v1Body['lossDistribution'];
+    for (const body of [
+      v1Body,
+      { ...v1Body, schemaVersion: 2 },
+      { ...multiCurrencyView(), schemaVersion: 1 },
+    ]) {
+      const oldView = createReplaySource(
+        fakeFetch({ './replay/manifest.json': manifest(), './replay/demo-eur-usd-gbp.json': body }, []),
+      );
+      expect(await oldView.view('demo-eur-usd-gbp')).toEqual({ ok: false, error: 'INVALID_RESPONSE' });
+    }
   });
 
   it('a portfolio missing from the manifest is NOT_FOUND without a request', async () => {

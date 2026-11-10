@@ -37,7 +37,7 @@ export function TopBar(props: {
       <div className="brand">
         <ChimeraMark />
         <div>
-          <p className="brand-name">Spectral Risk Chimera</p>
+          <h1 className="brand-name">Spectral Risk Chimera</h1>
           <p className="brand-tag">Kiroween 2026 · Frankenstein build · monitoring only, no trading</p>
         </div>
       </div>
@@ -91,8 +91,14 @@ export function TopBar(props: {
         </div>
         <div>
           <dt>NAV</dt>
-          <dd className="num">
+          <dd className="num" data-testid="topbar-nav">
             {data === undefined ? MISSING : withUnit(data.display.exposure.nav, data.display.currency)}
+            {data?.dataMode === 'DEMO' ? (
+              <>
+                {' '}
+                <Badge tone="demo" label="DEMO" title="Computed from DEMO fixture data" />
+              </>
+            ) : null}
           </dd>
         </div>
         <div>

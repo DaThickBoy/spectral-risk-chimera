@@ -39,5 +39,11 @@ export function utcText(timestamp: string | null): string {
     : timestamp;
 }
 
+/** Confidence as a percentage label: "0.95" -> "95%" by moving the decimal point (text only). */
+export function confidencePct(confidence: string | null): string {
+  const match = confidence === null ? null : /^0\.(\d{2})$/.exec(confidence);
+  return match?.[1] === undefined ? (confidence ?? MISSING) : `${match[1]}%`;
+}
+
 /** Status code as a readable label: `FX_STALE` -> `FX STALE`. */
 export const codeLabel = (code: string): string => code.replaceAll('_', ' ');

@@ -18,7 +18,10 @@
  *   units), so the frontend renders without calculating;
  * - `adjustedVaRAvailability`: the explicit OD-1 reason when no aggregator is
  *   assembled (H7); the VarView status codes are unchanged;
- * - `filing`: `NOT_CONFIGURED` (H8), no score.
+ * - `filing`: `NOT_CONFIGURED` (H8), no score;
+ * - `lossDistribution` (Kiroween A2): the 20-bucket histogram of the Base VaR scenario
+ *   losses, recomputed from the latest verified snapshot (`buildLossDistribution`), or why
+ *   it is unavailable.
  * No portfolio, ledger, or alert data is written. Valuation runs on request, as for the
  * positions route, so the recording FX service may append FX observation records and
  * providers may be called (design: Gateway rule 9, known limitation); no
@@ -26,6 +29,7 @@
  *
  * Validates: Requirements 17.1, 17.10, 20.6, 30.14, 35.1, 35.6.
  */
+import { LOSS_HISTOGRAM_BUCKETS } from '../risk/index.js';
 import type { SentimentState, SentimentView } from '../sentiment/index.js';
 import {
   DASHBOARD_SCHEMA_VERSION,
@@ -54,6 +58,7 @@ import type { PortfolioQueryService } from './portfolioQuery.js';
 import type { PortfolioService } from './portfolioService.js';
 import type { RiskService } from './riskService.js';
 import { buildPortfolioRiskView } from './riskViewBuilder.js';
+import { buildLossDistribution } from './lossDistribution.js';
 
 export type DashboardError = AppError<'NOT_FOUND'>;
 
@@ -219,6 +224,13 @@ export function createDashboardService(deps: DashboardServiceDependencies): Dash
             explanation: view.adjustmentExplanation,
           },
           filing: { status: 'NOT_CONFIGURED', explanation: FILING_EXPLANATION },
+          lossDistribution: buildLossDistribution({
+            risk,
+            scenarios: deps.risk.scenarioLosses(portfolioId),
+            currency: view.baseCurrency,
+            minorUnits,
+            bucketCount: LOSS_HISTOGRAM_BUCKETS,
+          }),
           display: {
             currency: view.baseCurrency,
             minorUnits,

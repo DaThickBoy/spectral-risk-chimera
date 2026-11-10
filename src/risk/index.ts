@@ -4,6 +4,14 @@ export { QUANTILE_METHOD, sortAscending, type7Quantile } from './quantile.js';
 export type { QuantileError, QuantileErrorCode } from './quantile.js';
 export { computeRisk, exposureOf, positionPnl, riskEngine, scenarioLosses } from './engine.js';
 export { adjustScenarios, evaluateEligibility } from './adjustment.js';
+export { LOSS_HISTOGRAM_BUCKETS, lossHistogram } from './histogram.js';
+export type {
+  LossBucket,
+  LossHistogram,
+  LossHistogramError,
+  LossHistogramErrorCode,
+  LossHistogramParams,
+} from './histogram.js';
 export type { AdjustedScenario, Eligibility } from './adjustment.js';
 export type { RiskEngine } from './engine.js';
 export { ALGORITHM_VERSION, CALC_FLAG_ORDER } from './types.js';
