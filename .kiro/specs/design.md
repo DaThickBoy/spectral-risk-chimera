@@ -2085,7 +2085,14 @@ Implementation (task 17.1): `buildPortfolioRiskView` in `src/app/riskViewBuilder
     - **Source.** `RiskService.scenarioLosses` recomputes the latest result's stored snapshot (hash and returns hash verified, R32.4) and returns `scenarioLosses(input)` (FR-5). The risk result, snapshot, and their hashes are unchanged.
     - **Bucketing** (`lossHistogram`, `src/risk/histogram.ts`, all Decimal). Production uses exactly `LOSS_HISTOGRAM_BUCKETS` = 20 equal-width buckets; tests may pass another count. The width is the smallest multiple of the base currency's minor unit (`currencyMinorUnits`, ISO 4217 via ICU) with `K * width >= max - min`. It is computed with Decimal `ceil` and corrected with exact multiplication; when every loss is equal, the width is one minor unit and all K buckets are kept. Edges are `min + i * width`, exact and unrounded. Buckets are lower-inclusive and upper-exclusive, except the last, which also includes its upper edge (>= max). Counts sum to the number of scenarios.
     - **Marker.** The raw, unrounded Type 7 quantile of the same losses at the stored confidence. It must equal the stored Base VaR `rawQuantile`, otherwise the distribution is `QUANTILE_MISMATCH`. The response also carries the marker's bucket, the number of losses strictly greater than it, and a 6-decimal plotting position in bucket-width units.
-    - **Unavailable** (a reason and an explanation, never zero bars): `BASE_VAR_UNAVAILABLE` (including when only a LAST_VALID figure is shown), `NO_SNAPSHOT`, `SNAPSHOT_RECOMPUTE_FAILED`, `INSUFFICIENT_SCENARIOS`, `SCENARIO_COUNT_MISMATCH`, `QUANTILE_MISMATCH`.
+    - **Unavailable** (a reason and an explanation, never zero bars), checked in this order:
+      - `BASE_VAR_UNAVAILABLE`: also when only a LAST_VALID figure is shown, or when the recomputed result has no Base VaR.
+      - `NO_SNAPSHOT`.
+      - `SNAPSHOT_RECOMPUTE_FAILED`.
+      - `SNAPSHOT_MISMATCH`: the scenarios' snapshot hash differs from the displayed result's `snapshotHash`, or the result has none. The risk view and the scenarios are read separately, so a calculation stored in between yields another snapshot; it is never substituted, even with an equal raw quantile.
+      - `SCENARIO_COUNT_MISMATCH`.
+      - `INSUFFICIENT_SCENARIOS`.
+      - `QUANTILE_MISMATCH`.
     - **Text.** Exact values are canonical strings; `*Display` strings are FR-14 money text for axis labels.
   - `dataMode` (`DEMO` when any input is DEMO), `runMode`, and a backend `freshness.summary`.
 
