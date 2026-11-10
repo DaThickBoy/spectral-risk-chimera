@@ -226,6 +226,10 @@ export function App({
                   labelled DEMO_DATA and never raise alerts.
                 </p>
               ) : null}
+              {/* Group labels (institutional redesign): plain text before each group, outside
+                  the heading outline, so section headings stay h2 and the tour card stays
+                  directly above the section it explains. */}
+              <p className="eyebrow">Risk analysis</p>
               {tourAt('panels')}
               <div className="panels">
                 <BaseVarPanel data={data} />
@@ -235,10 +239,13 @@ export function App({
               </div>
               {/* S5 order (ui-guidelines §3): positions, then charts, then supporting detail.
                   Currency exposure is followed by the FX rates behind it. */}
+              <p className="eyebrow">Portfolio</p>
               {tourAt('positions')}
               <PositionsSection data={data} />
+              <p className="eyebrow">Scenario distribution</p>
               {tourAt('loss')}
               <LossDistributionSection data={data} />
+              <p className="eyebrow">Currency and FX</p>
               {/* Full width: at half width the exact FX rates wrap into unreadable columns. */}
               <CurrencyExposureSection data={data} />
               <FxSection data={data} />

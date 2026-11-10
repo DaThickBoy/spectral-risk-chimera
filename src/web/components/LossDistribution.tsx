@@ -39,6 +39,15 @@ function Chart({ dist }: { readonly dist: AvailableLossDistribution }): ReactEle
       <desc id="loss-chart-desc">
         {`${String(dist.scenarioCount)} daily scenarios. The VaR marker at ${confidence} is ${dist.varMarker.rawQuantile} ${currency}. Scenarios with a larger loss: ${String(dist.varMarker.scenariosAbove)}. The table below lists every bucket.`}
       </desc>
+      {/* Gridline at the maximum count (existing plot geometry; no value is computed). */}
+      <line
+        className="chart-grid"
+        x1={plot.plotLeft}
+        x2={plot.plotRight}
+        y1={plot.plotTop}
+        y2={plot.plotTop}
+        aria-hidden="true"
+      />
       {/* Axes */}
       <line
         className="chart-axis"
@@ -148,37 +157,65 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
           Unavailable ({codeLabel(dist.reason)}): {dist.explanation}
         </p>
       ) : (
-        <>
-          <div className="legend" aria-hidden="true">
-            <span className="legend-item">
-              <span className="legend-swatch legend-bar" /> Scenario losses per bucket
-            </span>
-            <span className="legend-item">
-              <span className="legend-swatch legend-marker" /> VaR {confidencePct(dist.confidence)} (raw
-              quantile)
-            </span>
+        // Layout only: on wide screens the chart and its supporting text sit side by side; the
+        // DOM order (chart first) is the reading and mobile order. No value changes here.
+        <div className="loss-layout" data-testid="loss-layout">
+          <div className="loss-main" data-testid="loss-main">
+            <div className="legend" aria-hidden="true">
+              <span className="legend-item">
+                <span className="legend-swatch legend-bar" /> Scenario losses per bucket
+              </span>
+              <span className="legend-item">
+                <span className="legend-swatch legend-marker" /> VaR {confidencePct(dist.confidence)} (raw
+                quantile)
+              </span>
+            </div>
+            {/* Focusable so keyboard users can scroll the chart on narrow screens (WCAG 2.1.1). */}
+            <div
+              className="chart-wrap"
+              role="region"
+              aria-label="Loss distribution chart, scrollable"
+              tabIndex={0}
+            >
+              <Chart dist={dist} />
+            </div>
           </div>
-          {/* Focusable so keyboard users can scroll the chart on narrow screens (WCAG 2.1.1). */}
-          <div
-            className="chart-wrap"
-            role="region"
-            aria-label="Loss distribution chart, scrollable"
-            tabIndex={0}
-          >
-            <Chart dist={dist} />
+          <div className="loss-side" data-testid="loss-side">
+            <p className="loss-side-label">Summary</p>
+            <p className="caption" data-testid="loss-summary">
+              {/* Concise: backend display text only. The exact, unrounded values are in the
+                disclosure below (institutional refinement; nothing is rounded here). */}
+              {String(dist.scenarioCount)} daily scenarios from returns ending {dist.scenarioWindow.firstDate}{' '}
+              to {dist.scenarioWindow.lastDate} (UTC dates), in {String(dist.bucketCount)} buckets of{' '}
+              {withUnit(dist.widthDisplay, dist.currency)}. VaR {confidencePct(dist.confidence)} marker at{' '}
+              {withUnit(dist.varMarker.rawQuantileDisplay, dist.currency)}. Scenarios with a larger loss than
+              the marker: {String(dist.varMarker.scenariosAbove)}. Not a forecast and not the worst possible
+              loss.
+            </p>
           </div>
-          <p className="caption" data-testid="loss-summary">
-            {String(dist.scenarioCount)} daily scenarios from returns ending {dist.scenarioWindow.firstDate}{' '}
-            to {dist.scenarioWindow.lastDate} (UTC dates), in {String(dist.bucketCount)} buckets of{' '}
-            {withUnit(dist.widthDisplay, dist.currency)} (exact {dist.width}). VaR{' '}
-            {confidencePct(dist.confidence)} marker: {withUnit(dist.varMarker.rawQuantile, dist.currency)}{' '}
-            (raw quantile, unrounded). Scenarios with a larger loss than the marker:{' '}
-            {String(dist.varMarker.scenariosAbove)}. Not a forecast and not the worst possible loss.
-          </p>
           {/* Progressive disclosure (ui-guidelines §3): the summary above and the chart's own
-              description stay visible; the exact bucket table is one native disclosure away. */}
-          <details className="disclosure" data-testid="loss-table-details">
-            <summary>Exact bucket table ({String(dist.bucketCount)} buckets)</summary>
+              description stay visible; the exact bucket table is one native disclosure away.
+              Closed, it sits in the side column under the summary; opened, it spans the card. */}
+          <details className="disclosure loss-details" data-testid="loss-table-details">
+            <summary>Exact values and bucket table ({String(dist.bucketCount)} buckets)</summary>
+            <p className="exact-hint" id="loss-exact-hint">
+              Full precision, unrounded. Scroll sideways in the boxes to read each value and the bucket table.
+            </p>
+            <div
+              className="exact-values"
+              role="region"
+              aria-label="Exact loss distribution values, scrollable"
+              aria-describedby="loss-exact-hint"
+              tabIndex={0}
+              data-testid="loss-exact"
+            >
+              <dl className="facts">
+                <dt>VaR {confidencePct(dist.confidence)} marker: raw quantile (exact, unrounded)</dt>
+                <dd className="num">{withUnit(dist.varMarker.rawQuantile, dist.currency)}</dd>
+                <dt>Bucket width (exact)</dt>
+                <dd className="num">{withUnit(dist.width, dist.currency)}</dd>
+              </dl>
+            </div>
             <div
               className="table-wrap"
               role="region"
@@ -229,7 +266,7 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
               </table>
             </div>
           </details>
-        </>
+        </div>
       )}
     </section>
   );

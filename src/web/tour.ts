@@ -69,7 +69,7 @@ const CHARTS_STEP: TourStep = {
   anchor: 'positions',
   title: 'Allocation and currency exposure',
   body: [
-    "Each allocation bar is a position's share as reported by the backend, on a fixed 0–100 % axis.",
+    "Each numbered segment of the allocation bar is a position's share as reported by the backend, on a fixed 0–100 % axis. Any unfilled part is not a listed position.",
     "Further down, the currency exposure bars run from 0 to the backend's gross exposure. An outlined bar is a negative value.",
     'The bars are a visual aid. The exact values are in the tables next to them.',
   ],
@@ -81,8 +81,8 @@ function lossStep(data: DashboardViewResponse): TourStep {
     title: 'Loss distribution and the VaR marker',
     body: [
       'The histogram groups the same one-day scenario losses behind Base VaR into equal-width buckets. Negative losses are gains.',
-      `The dashed marker is the raw ${confidencePct(data.view.confidence)} quantile, and the text below the chart states how many scenarios lost more.`,
-      '"Exact bucket table" opens every bucket\'s exact edges and counts.',
+      `The dashed marker is the raw ${confidencePct(data.view.confidence)} quantile, and the summary next to or below the chart states how many scenarios lost more.`,
+      '"Exact values and bucket table" opens the exact raw quantile and every bucket\'s exact edges and counts.',
     ],
   };
 }

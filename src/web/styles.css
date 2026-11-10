@@ -12,6 +12,7 @@
   --color-raised: #18202e;
   --color-border: #232d3c;
   --color-border-strong: #34435a;
+  --color-border-subtle: #1b2330; /* supporting sections: lighter separation than primary surfaces */
   --color-row-hover: #151d2a;
   /* Text */
   --color-text: #e6e9ef;
@@ -30,6 +31,17 @@
   --color-critical-bg: #2a1218;
   /* Charts (neutral data marks; the accent stays reserved for interaction) */
   --chart-bar: #8b9cb6; /* neutral slate-blue data mark, 6.5:1 on panels */
+  --chart-grid: #222c3b;
+  /* Allocation composition: neutral, non-semantic slate shades (each at least 3:1 on panels);
+     segments are also separated by a gap, and the legend carries every value as text. */
+  /* Each shade also carries dark position numbers at 4.5:1 or more. */
+  --chart-seq-1: #8b9cb6;
+  --chart-seq-2: #6a7fa0;
+  --chart-seq-3: #b7c3d5;
+  --chart-seq-4: #c9d3e1;
+  --chart-seq-5: #7b8eab;
+  --chart-seq-6: #a1afc4;
+  --chart-seq-ink: #0b0e13;
   --chart-axis: var(--color-text-muted);
   --chart-marker: var(--color-text);
   --chart-min-width: 600px;
@@ -683,8 +695,9 @@ button:disabled:hover {
 }
 
 .rate {
-  overflow-wrap: anywhere;
-  max-width: 28ch;
+  /* Institutional redesign: an exact rate stays on one line (the table scrolls in its own
+     region) instead of breaking a 40-digit number across lines. */
+  white-space: nowrap;
 }
 
 .muted-inline,
@@ -865,6 +878,347 @@ thead th {
 .legend-marker {
   height: 0;
   border-top: 2px dashed var(--chart-marker);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Institutional redesign. Presentation only: layout, surfaces, and type. No value is changed,
+   rounded, or computed here; teal stays reserved for interaction (ui-guidelines §1).
+   --------------------------------------------------------------------------------------------- */
+
+/* Compact header: facts as inline label/value pairs instead of stacked blocks. Every provenance
+   item stays visible. */
+.topbar {
+  padding: var(--space-3) var(--space-4);
+  row-gap: var(--space-2);
+}
+
+.topbar-facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.replay-note {
+  font-size: var(--size-label);
+  line-height: 1.5;
+}
+
+/* Group labels between the summary, risk analysis, portfolio, scenarios, and FX groups. */
+.eyebrow {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--size-label);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Surface hierarchy: the summary and the Base VaR panel keep strong borders; supporting
+   sections and panels get a subtle one, so not every card carries the same weight. */
+.section,
+.panel:not(.panel-primary) {
+  border-color: var(--color-border-subtle);
+}
+
+.section {
+  padding: var(--space-4) var(--space-5);
+}
+
+/* Overview: after NAV and Base VaR, the exposure and cash strip starts behind a divider. */
+.summary {
+  padding: var(--space-4) var(--space-5);
+}
+
+.summary-primary + .summary-figure:not(.summary-primary) {
+  padding-left: var(--space-5);
+  border-left: 1px solid var(--color-border);
+}
+
+.summary-figure:has(.help-panel) + .summary-figure:not(.summary-primary) {
+  padding-left: 0;
+  border-left: 0;
+}
+
+/* Allocation composition: one bar of side-by-side segments plus a labelled legend. */
+.composition {
+  display: flex;
+  height: 20px;
+  margin: var(--space-2) 0 var(--space-3);
+  background: var(--color-raised);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.composition-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  min-width: 0;
+  color: var(--chart-seq-ink);
+  font-family: var(--font-num);
+  font-size: var(--size-label);
+  font-weight: 700;
+  line-height: 1;
+  height: 100%;
+  box-shadow: inset -2px 0 0 var(--color-panel); /* a gap that does not change any width */
+}
+
+.composition-segment:last-child {
+  box-shadow: none;
+}
+
+.composition-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-2) var(--space-5);
+}
+
+.composition-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  color: var(--chart-seq-ink);
+  font-family: var(--font-num);
+  font-size: var(--size-label);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* The unfilled part of the bar: an outlined swatch matching the empty track. */
+.swatch-unfilled {
+  background: var(--color-raised);
+  border: 1px solid var(--color-border-strong);
+}
+
+.composition-unfilled {
+  grid-column: 1 / -1;
+  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--color-text-secondary);
+  font-size: var(--size-label);
+}
+
+.seq-1 {
+  background: var(--chart-seq-1);
+}
+
+.seq-2 {
+  background: var(--chart-seq-2);
+}
+
+.seq-3 {
+  background: var(--chart-seq-3);
+}
+
+.seq-4 {
+  background: var(--chart-seq-4);
+}
+
+.seq-5 {
+  background: var(--chart-seq-5);
+}
+
+.seq-6 {
+  background: var(--chart-seq-6);
+}
+
+/* Exact values: one line each, scrolling inside a focusable region rather than wrapping. */
+/* A bordered box with an always-visible horizontal scrollbar, so the scroll is discoverable even
+   where the platform hides overlay scrollbars. */
+.exact-values {
+  overflow-x: scroll;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+.exact-values::-webkit-scrollbar {
+  height: 8px;
+}
+
+.exact-values::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 4px;
+}
+
+.exact-values .facts {
+  margin: 0;
+}
+
+.exact-hint {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--size-label);
+}
+
+.exact-values .facts dd {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+/* Charts: consistent gridline and annotation typography. */
+.chart-grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.chart-marker-label {
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .section,
+  .summary {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  /* Compact mobile header (target about 250–290 px at 390 px wide). Every provenance item stays
+     visible: the DEMO DATA and RECORDED REPLAY badges name themselves, so their "Data" and
+     "Source" labels become screen-reader-only; "Mode" stays visible. Facts flow on two lines,
+     with the source and recording time last. Controls keep their full 32 px height. */
+  .topbar {
+    padding: var(--space-3);
+    row-gap: var(--space-2);
+  }
+
+  .brand-tag {
+    font-size: var(--size-label);
+  }
+
+  .topbar-controls label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .topbar-controls select {
+    flex: 1 1 100%;
+  }
+
+  .topbar-controls button {
+    flex: 1 1 0;
+  }
+
+  .topbar-facts {
+    gap: var(--space-1) var(--space-3);
+    font-size: var(--size-label);
+  }
+
+  .topbar-facts > div:nth-child(1) dt,
+  .topbar-facts > div:nth-child(2) dt {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .topbar-facts > div:nth-child(2) {
+    order: 1;
+  }
+
+  .topbar-facts dt {
+    font-size: var(--size-label);
+  }
+
+  /* Stacked on narrow screens: rows separate the figures, no vertical divider. */
+  .summary-primary + .summary-figure:not(.summary-primary) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+/* Loss distribution layout: one column by default (chart first). From 1100 px the chart keeps its
+   600–800 px range in the main column and the summary and disclosure sit beside it. An opened
+   disclosure spans both columns so the bucket table gets the full card width. */
+.loss-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4) var(--space-5);
+}
+
+.loss-main,
+.loss-side {
+  min-width: 0;
+}
+
+/* In-card label: subordinate to the page-level group labels (no uppercase or wide tracking). */
+.loss-side-label {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--size-label);
+  font-weight: 600;
+}
+
+.loss-side .caption {
+  margin-top: 0;
+  line-height: 1.6;
+}
+
+.loss-details {
+  margin-top: 0;
+}
+
+@media (min-width: 1100px) {
+  .loss-layout {
+    grid-template-columns: minmax(600px, 800px) minmax(16rem, 1fr);
+    grid-template-rows: auto 1fr;
+    gap: var(--space-3) var(--space-5);
+  }
+
+  /* The hairline sits on the chart column's right edge, spanning both rows, so the supporting
+     column reads as one continuous column beside the chart. */
+  .loss-main {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    padding-right: var(--space-5);
+    border-right: 1px solid var(--color-border-subtle);
+  }
+
+  /* The side column: summary on row 1, the closed disclosure under it on row 2. */
+  .loss-side {
+    grid-column: 2;
+    grid-row: 1;
+    padding-top: var(--space-2);
+  }
+
+  .loss-details {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+  }
+
+  /* Opened: the full bucket table needs the card width, so the disclosure moves below both. */
+  .loss-details[open] {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
+  }
 }
 
 /* Responsive layout */
