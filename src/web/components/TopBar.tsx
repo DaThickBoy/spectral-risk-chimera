@@ -1,10 +1,14 @@
-// Top bar (ui-guidelines 3): portfolio, base currency, NAV, data as-of time, data mode, source,
-// and FX freshness, always visible. Kiroween identity is a small static mark and a label only.
+// Top bar (ui-guidelines 3): identity, portfolio selection, data mode, data source, and run mode,
+// always visible. NAV, exposure, as-of time, and freshness are the headline summary below it
+// (Summary.tsx). Kiroween identity is a small static mark and a label only.
 import type { ReactElement } from 'react';
 import type { DashboardIndexResponse, DashboardViewResponse } from '../../shared/apiContracts/index.js';
-import type { SourceInfo } from '../data/source.js';
-import { MISSING, codeLabel, utcText, withUnit } from '../format.js';
+import type { StreamState } from '../data/liveUpdates.js';
+import type { LoadError, SourceInfo } from '../data/source.js';
+import { MISSING, codeLabel, utcText } from '../format.js';
+import { useLiveProviders, useLiveStatus } from '../live.tsx';
 import { Badge, toneOf } from './Badge.tsx';
+import type { BadgeTone } from './Badge.tsx';
 
 function ChimeraMark(): ReactElement {
   // A static, single-colour mark: three joined heads of the chimera. Decorative only.
@@ -23,6 +27,44 @@ function ChimeraMark(): ReactElement {
   );
 }
 
+const STREAM_BADGE: Readonly<Record<StreamState, { tone: BadgeTone; label: string }>> = {
+  CONNECTING: { tone: 'neutral', label: 'STREAM CONNECTING' },
+  CONNECTED: { tone: 'current', label: 'STREAM CONNECTED' },
+  RECONNECTING: { tone: 'warning', label: 'STREAM RECONNECTING' },
+  DISCONNECTED: { tone: 'unavailable', label: 'STREAM DISCONNECTED' },
+};
+
+/** LIVE mode: the update stream's state, a failed refresh, and providers that are not available. */
+function LiveStatus(props: { readonly refreshError: LoadError | undefined }): ReactElement | null {
+  const status = useLiveStatus();
+  const providers = useLiveProviders().filter((p) => p.state !== 'AVAILABLE');
+  if (status === undefined) return null;
+  const badge = STREAM_BADGE[status.state];
+  return (
+    <span className="live-status" role="status" data-testid="live-status">
+      <Badge tone={badge.tone} label={badge.label} />
+      {status.state === 'RECONNECTING' ? ` attempt ${String(status.attempt)}` : null}
+      {props.refreshError === undefined ? null : (
+        <>
+          {' '}
+          <Badge
+            tone="warning"
+            label="REFRESH FAILED"
+            title={`The last automatic refresh failed (${codeLabel(props.refreshError)}); the previous view is shown.`}
+          />
+        </>
+      )}
+      {providers.map((p) => (
+        <span key={p.provider} className="muted-inline" data-testid="live-provider">
+          {' '}
+          · {p.provider} {codeLabel(p.state)}
+          {p.lastErrorCode === undefined ? '' : ` (${codeLabel(p.lastErrorCode)})`}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function TopBar(props: {
   readonly source: SourceInfo | undefined;
   readonly index: DashboardIndexResponse | undefined;
@@ -30,6 +72,8 @@ export function TopBar(props: {
   readonly onSelect: (id: string) => void;
   readonly onReload: () => void;
   readonly data: DashboardViewResponse | undefined;
+  /** LIVE mode: why the last automatic view refresh failed (the previous view stays shown). */
+  readonly refreshError?: LoadError | undefined;
 }): ReactElement {
   const { data } = props;
   return (
@@ -81,43 +125,15 @@ export function TopBar(props: {
                 recorded {utcText(props.source.recordedAt ?? null)}
               </>
             ) : (
-              'Live local backend'
+              <>
+                Live local backend <LiveStatus refreshError={props.refreshError} />
+              </>
             )}
           </dd>
         </div>
         <div>
           <dt>Mode</dt>
           <dd>{data === undefined ? MISSING : codeLabel(data.runMode)}</dd>
-        </div>
-        <div>
-          <dt>NAV</dt>
-          <dd className="num" data-testid="topbar-nav">
-            {data === undefined ? MISSING : withUnit(data.display.exposure.nav, data.display.currency)}
-            {data?.dataMode === 'DEMO' ? (
-              <>
-                {' '}
-                <Badge tone="demo" label="DEMO" title="Computed from DEMO fixture data" />
-              </>
-            ) : null}
-          </dd>
-        </div>
-        <div>
-          <dt>Market data as of</dt>
-          <dd>{data?.freshness.asOfDate ?? MISSING}</dd>
-        </div>
-        <div>
-          <dt>Calculated</dt>
-          <dd>{data === undefined ? MISSING : utcText(data.freshness.calculatedAt)}</dd>
-        </div>
-        <div>
-          <dt>Freshness</dt>
-          <dd>
-            {data === undefined ? (
-              MISSING
-            ) : (
-              <Badge tone={toneOf(data.freshness.summary)} label={codeLabel(data.freshness.summary)} />
-            )}
-          </dd>
         </div>
       </dl>
       {props.source?.note !== undefined ? <p className="replay-note">{props.source.note}</p> : null}

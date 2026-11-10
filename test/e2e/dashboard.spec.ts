@@ -69,8 +69,11 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     await expect(bar).toContainText('recorded 2026-11-06 16:00 UTC');
     await expect(bar).toContainText('DEMO DATA');
     await expect(bar).toContainText('DEMO FIXTURES');
-    await expect(bar).toContainText('22375.74 EUR');
-    await expect(bar).toContainText('CURRENT');
+    // S1: NAV and freshness are in the headline summary, directly below the top bar.
+    const summary = page.getByTestId('summary');
+    await expect(summary).toContainText('22375.74 EUR');
+    await expect(summary).toContainText('CURRENT');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
     await expect(page.locator('.replay-note')).toContainText('Recorded DEMO replay');
     await expect(page.locator('.demo-banner')).toContainText('DEMO DATA');
 
@@ -87,8 +90,8 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     await expect(panel(page, 'Sentiment-Adjusted VaR')).toContainText('1 day · 95% · as of 2026-11-06');
     await expect(panel(page, 'Market Sentiment')).toContainText('as of 2026-11-06 16:00 UTC');
     await expect(panel(page, 'SEC Filing Risk')).toContainText('as of \u2014 (not configured)');
-    await expect(page.getByTestId('topbar-nav')).toContainText('DEMO');
-    await expect(page.getByTestId('overview-badges')).toContainText('DEMO');
+    await expect(page.getByTestId('summary-nav')).toHaveText('22375.74 EUR');
+    await expect(page.getByTestId('summary-badges')).toContainText('DEMO DATA');
 
     const adjusted = panel(page, 'Sentiment-Adjusted VaR');
     await expect(adjusted.getByTestId('adjusted-var-value')).toHaveText('Unavailable');
@@ -211,7 +214,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     await page.locator('#portfolio-select').selectOption('demo-eur-only');
     await expect(page).toHaveURL(/\?portfolio=demo-eur-only$/);
     await expect(page.getByTestId('base-var-value')).toHaveText('140.18 EUR');
-    await expect(page.locator('header.topbar')).toContainText('14025.44 EUR');
+    await expect(page.getByTestId('summary-nav')).toHaveText('14025.44 EUR');
     // Only the identity rate: nothing depends on the ECB.
     const fx = page.locator('section', { has: page.getByRole('heading', { name: 'FX rates used' }) });
     await expect(fx.locator('tbody tr')).toHaveCount(1);
@@ -310,7 +313,7 @@ test.describe('states', () => {
     await page.goto(BASE);
     await expect(page.getByTestId('base-var-value')).toHaveText('\u2014');
     await expect(panel(page, 'Base VaR')).toContainText('Unavailable: FX UNAVAILABLE');
-    await expect(page.locator('header.topbar')).toContainText('FX UNAVAILABLE');
+    await expect(page.getByTestId('summary-badges')).toContainText('FX UNAVAILABLE');
     const fx = page.locator('section', { has: page.getByRole('heading', { name: 'FX rates used' }) });
     await expect(fx).toContainText('STALE');
     await expect(fx).toContainText('PROVIDER ERROR');

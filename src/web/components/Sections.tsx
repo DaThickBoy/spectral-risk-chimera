@@ -1,45 +1,15 @@
-// Portfolio overview, currency exposure, FX sources, and positions (task 17.3). Every figure is
+// Currency exposure, FX sources, and positions (task 17.3; the exposure overview is the headline
+// summary, Summary.tsx). Every figure is
 // backend text (money already rounded by the backend, FR-14); nothing is calculated here.
 import type { ReactElement } from 'react';
 import type { DashboardViewResponse } from '../../shared/apiContracts/index.js';
 import { MISSING, codeLabel, percentText, utcText, withUnit } from '../format.js';
+import { AllocationChart } from './AllocationChart.tsx';
+import { ExposureChart } from './ExposureChart.tsx';
+import { Help } from './Help.tsx';
 import { Badge, toneOf } from './Badge.tsx';
 
 type View = DashboardViewResponse;
-
-export function OverviewSection({ data }: { readonly data: View }): ReactElement {
-  const money = data.display.exposure;
-  const currency = data.display.currency;
-  const rows: readonly [string, string | null][] = [
-    ['NAV', money.nav],
-    ['Long exposure', money.long],
-    ['Short exposure', money.short],
-    ['Gross exposure', money.gross],
-    ['Net exposure', money.net],
-    ['Cash', money.cash],
-  ];
-  return (
-    <section className="section" aria-labelledby="overview-title">
-      <h2 id="overview-title">
-        Portfolio overview <span className="muted-inline">· base currency {data.view.baseCurrency}</span>
-      </h2>
-      <p className="badges" data-testid="overview-badges">
-        <Badge tone={toneOf(data.view.exposure.status)} label={codeLabel(data.view.exposure.status)} />
-        {data.dataMode === 'DEMO' ? (
-          <Badge tone="demo" label="DEMO" title="Computed from DEMO fixture data" />
-        ) : null}
-      </p>
-      <dl className="facts facts-grid">
-        {rows.map(([label, value]) => (
-          <div key={label} className="fact">
-            <dt>{label}</dt>
-            <dd className="num">{withUnit(value, currency)}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
 
 export function CurrencyExposureSection({ data }: { readonly data: View }): ReactElement {
   const currency = data.display.currency;
@@ -47,11 +17,13 @@ export function CurrencyExposureSection({ data }: { readonly data: View }): Reac
   return (
     <section className="section" aria-labelledby="ccy-title">
       <h2 id="ccy-title">Currency exposure</h2>
-      {data.dataMode === 'DEMO' ? (
-        <p className="badges" data-testid="ccy-badges">
+      <p className="badges" data-testid="ccy-badges">
+        {data.dataMode === 'DEMO' ? (
           <Badge tone="demo" label="DEMO" title="Computed from DEMO fixture data" />
-        </p>
-      ) : null}
+        ) : null}
+        <Help term="currencyExposure" />
+      </p>
+      <ExposureChart data={data} />
       {/* Focusable so keyboard users can scroll the table on narrow screens (WCAG 2.1.1). */}
       <div className="table-wrap" role="region" aria-label="Currency exposure table, scrollable" tabIndex={0}>
         <table>
@@ -208,6 +180,7 @@ export function PositionsSection({ data }: { readonly data: View }): ReactElemen
   return (
     <section className="section" aria-labelledby="positions-title">
       <h2 id="positions-title">Positions and allocation</h2>
+      <AllocationChart data={data} />
       {/* Focusable so keyboard users can scroll the table on narrow screens (WCAG 2.1.1). */}
       <div className="table-wrap" role="region" aria-label="Positions table, scrollable" tabIndex={0}>
         <table>

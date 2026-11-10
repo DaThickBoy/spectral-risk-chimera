@@ -7,6 +7,7 @@ import { histogramPlot } from '../chartAdapter.js';
 import type { AvailableLossDistribution, ChartFrame } from '../chartAdapter.js';
 import { MISSING, codeLabel, confidencePct, utcText, withUnit } from '../format.js';
 import { Badge, toneOf } from './Badge.tsx';
+import { Help } from './Help.tsx';
 
 type View = DashboardViewResponse;
 
@@ -140,6 +141,7 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
         {data.dataMode === 'DEMO' ? (
           <Badge tone="demo" label="DEMO" title="Computed from DEMO fixture data" />
         ) : null}
+        <Help term="lossDistribution" />
       </p>
       {dist.status === 'UNAVAILABLE' ? (
         <p className="reason" data-testid="loss-unavailable">

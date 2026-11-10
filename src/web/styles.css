@@ -9,6 +9,7 @@
   --color-panel: #12161d;
   --color-raised: #1a1f28;
   --color-border: #262c36;
+  --color-border-strong: #3a4250;
   /* Text */
   --color-text: #e6e9ef;
   --color-text-secondary: #9aa3b2;
@@ -27,6 +28,8 @@
   --chart-axis: var(--color-text-muted);
   --chart-marker: var(--color-text);
   --chart-min-width: 600px;
+  /* The loss chart's viewBox is 640 wide; capping it bounds text scaling to 1.25x on desktop. */
+  --chart-max-width: 800px;
   /* Type */
   --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-num: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, monospace;
@@ -34,6 +37,7 @@
   --size-table: 13px;
   --size-small: 13px;
   --size-metric: 26px;
+  --size-metric-secondary: 20px;
   --size-h2: 15px;
   /* Spacing */
   --space-1: 4px;
@@ -196,6 +200,163 @@ select:hover {
   margin: 0 0 var(--space-4);
 }
 
+/* Headline summary (S1): flat, one border, the two primary figures largest. */
+.summary {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.summary .badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.summary-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+}
+
+.summary-figure dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--size-small);
+}
+
+.summary-figure dd {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--size-body);
+}
+
+.summary-primary dd {
+  font-size: var(--size-metric);
+}
+
+/* Allocation chart (S2): fixed 0–100 % axis, text first, bars as a visual aid. */
+.allocation {
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.allocation-title {
+  font-size: var(--size-small);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.allocation-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.allocation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 6rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.allocation-ticker {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.allocation-track {
+  height: 10px;
+  background: var(--color-raised);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.allocation-bar {
+  display: block;
+  height: 100%;
+  background: var(--chart-bar);
+}
+
+/* S3: a negative exposure is an outlined bar (the label carries the "-" sign; never colour alone). */
+.bar-negative {
+  background: transparent;
+  border: 1px solid var(--chart-bar);
+  box-sizing: border-box;
+}
+
+.allocation-value {
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .allocation-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .allocation-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* Contextual help (S4): a small "?" button; the explanation opens inline, never over a figure. */
+.help {
+  display: inline;
+}
+
+.help-button {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0 var(--space-1);
+  margin-left: var(--space-1);
+  font-size: var(--size-small);
+  line-height: 1;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.help-panel {
+  display: block;
+  max-width: 34rem;
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: var(--size-small);
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.help-line {
+  display: block;
+}
+
+.help-line + .help-line {
+  margin-top: var(--space-1);
+}
+
+.help-kind {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
 /* Panels: four separate panels, never merged (R35.1) */
 .panels {
   display: grid;
@@ -215,6 +376,13 @@ select:hover {
 
 .panel-header {
   margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* S5: every section heading has the same rhythm as the panel headers. */
+.section > h2 {
+  margin-bottom: var(--space-3);
 }
 
 .panel-params {
@@ -232,6 +400,51 @@ select:hover {
 
 .metric-unavailable {
   color: var(--color-text-secondary);
+  font-size: var(--size-metric-secondary);
+}
+
+/* S5 hierarchy: the headline risk figure is raised; status-only panels are quieter. Weight comes
+   from surface and border only, never from a data colour. */
+.panel-primary {
+  background: var(--color-raised);
+  border-color: var(--color-border-strong);
+}
+
+.panel-compact .caption {
+  margin-top: var(--space-2);
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.status-row .metric {
+  margin: 0;
+}
+
+/* S5: native disclosure for technical detail; the summary is keyboard reachable with the global
+   focus ring. */
+.disclosure {
+  margin-top: var(--space-2);
+  font-size: var(--size-small);
+}
+
+.disclosure > summary {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  width: fit-content;
+}
+
+.disclosure > summary:hover {
+  color: var(--color-text);
+}
+
+.disclosure[open] > summary {
+  margin-bottom: var(--space-2);
 }
 
 .reason {
@@ -436,6 +649,7 @@ td.num {
   display: block;
   width: 100%;
   min-width: var(--chart-min-width);
+  max-width: var(--chart-max-width);
   height: auto;
 }
 

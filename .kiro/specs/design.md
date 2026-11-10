@@ -2109,7 +2109,36 @@ Implementation (task 17.1): `buildPortfolioRiskView` in `src/app/riskViewBuilder
   - `createReplaySource`: recorded responses.
 
   Both issue GET only and validate every body with the shared contracts. The proposed replay format is `DashboardReplayManifestSchema`: a `manifest.json` holding the recorded index plus one plain file name per portfolio, each file holding the recorded view body verbatim. The exporter and the publication workflow are open (OD-21).
-- **No background activity.** Reload is manual; there is no polling and no stream subscription yet. A dashboard request values positions on demand, like the positions route.
+- **Headline summary (roadmap S1).** `web/components/Summary.tsx`, directly below the top bar, shows:
+  - **Figures:** NAV and Base VaR (`1 day · <confidence>`, with its validity badge) as the primary figures, then gross, net, long, and short exposure and cash. All are the backend's `display` money text, and `—` when unavailable.
+  - **Badges:** the data mode, the freshness summary, the exposure status when it is not `OK`, the market-data as-of date, and the calculation time.
+  - **Not shown:** no VaR share of NAV.
+  - **Replaces:** the former Portfolio overview section. The top bar keeps identity, portfolio selection, data mode, source, and run mode.
+- **Allocation chart (roadmap S2).** `web/components/AllocationChart.tsx` sits at the top of Positions and allocation:
+  - **Bars:** one horizontal bar per position, in backend order, on a fixed 0–100 % axis (not scaled to the largest value). `allocationBars` in the chart adapter converts each backend `allocationPct` to a bar width.
+  - **Labels:** the exact backend text, padded as in the table.
+  - **Missing values:** no bar, with the position's valuation status. A value outside the axis is reported, not clamped. When no position has an allocation, a statement replaces the chart.
+  - **Not computed:** no allocation, ranking, or "largest" emphasis. The positions table remains the exact-value table.
+- **Currency exposure chart (roadmap S3).** `web/components/ExposureChart.tsx` sits above the currency exposure table:
+  - **Bars:** one horizontal bar per instrument currency, in backend order. The fixed axis runs from 0 to the backend's gross exposure, which no currency's absolute exposure exceeds. `exposureBars` in the chart adapter converts the values for plotting only.
+  - **Labels:** the backend's display money text, in the base currency.
+  - **Negative values:** the `-` sign in the label and an outlined bar.
+  - **Missing values:** no bar, with the currency's status. When gross exposure is unavailable, nothing is plotted, and a statement says so.
+  - **Not computed:** no summing, sorting, ranking, or normalization across currencies. The table remains the exact-value table.
+- **Contextual glossary (roadmap S4).** `web/glossary.ts` holds static text for nine terms: NAV, Base VaR, confidence and horizon, raw quantile, Adjusted VaR, exposure, currency exposure, loss distribution and VaR marker, and the DEMO/CURRENT/STALE/UNAVAILABLE states. Each entry separates the general definition ("In general") from this dashboard's convention ("In this dashboard"), which follows the documented engine. `components/Help.tsx` renders it.
+  - **Pattern:** a small native `<button aria-expanded>` next to the label, never inside a heading. Enter or Space toggles it, and Escape closes it while focus stays on the button. The explanation is a `role="note"` element that exists only while open, rendered inline below the label. It never overlays a figure, and `aria-controls` points to it only while it exists. There is one trigger per term and no glossary page.
+  - **Content constraints:** UNAVAILABLE is stated to be "—" and not zero. The Adjusted VaR entry gives the threshold and multiplier, says the figure is unavailable because of OD-1 and DEMO sentiment, and says sentiment does not affect any risk figure. Glossary text contains no computed values.
+- **Final presentation pass (roadmap S5).** Presentation only: no contract, calculation, or fixture change.
+  - **Hierarchy:** Base VaR is the one `panel-primary` (raised surface, stronger border). An unavailable Adjusted VaR and the unconfigured filing panel are `panel-compact`, and their "Unavailable" or "—" uses the 20 px secondary metric size. Weight comes from surface and border only, never from a data colour.
+  - **Adjusted VaR unavailable:** UNAVAILABLE and the reason badge with its open decision (for example `AGGREGATION NOT APPROVED · OD-1`) stay visible. The engine status and the backend explanation are inside a native `<details>` ("Why it is unavailable"), which is closed by default and still in the accessibility tree.
+  - **Filing not configured:** one status row (`—` plus `NOT CONFIGURED`) and a caption with the backend explanation. There is no control, link, or placeholder score.
+  - **Order (ui-guidelines §3):** summary, the four panels, positions and allocation, loss distribution, currency exposure, then FX rates used, each full width. In the visual review, a side-by-side currency/FX row made the exact FX rates wrap into unreadable columns, so it was reverted.
+  - **Loss chart width:** the SVG keeps its 600 px minimum and is capped at 800 px (`--chart-max-width`; viewBox 640). Its text then scales at most 1.25× on desktop instead of about 2.2×.
+- **Live updates (task 17.4, LIVE mode only).** `web/data/liveUpdates.ts` reads `WS /stream` and validates every message with `StreamEventSchema`; invalid messages are dropped and counted. There is no polling. The static replay never creates it, and it computes no financial value.
+  - **Risk.** A `RiskUpdate` for the selected portfolio marks the view dirty. At most one `GET /dashboard/portfolios/:id` re-fetch starts per animation frame, and at most one is in flight; an event during a re-fetch causes exactly one more. The view is replaced in place, and a failed re-fetch keeps the previous view and shows `REFRESH FAILED`.
+  - **Sentiment.** A `SentimentUpdate` changes only its ticker's row, through a per-ticker subscription, with the exact backend value, mapped like the view model (`sentimentOf`). The row shows the newer of the view value and the streamed value, by observation time.
+  - **Status.** The stream state (`CONNECTING`, `CONNECTED`, `RECONNECTING` with the attempt, `DISCONNECTED`) and any provider that is not `AVAILABLE` are shown in the top bar. Reconnects use fixed delays (1, 2, 5, 10, 30 s), and a successful reconnect re-fetches the view once.
+  - **Elsewhere.** Reload stays manual. A dashboard request values positions on demand, like the positions route.
 - **URL state.** `?portfolio=<id>` selects a portfolio. It supports deep links, back and forward, and refresh on the current path; an unknown id falls back to the first listed portfolio.
 
 **Static replay and GitHub Pages (OD-21, resolved 2026-11-09).**
