@@ -1,0 +1,60 @@
+// Guided tour step (ui-guidelines §8): a non-modal card rendered inline above the section it
+// explains, so it never overlays a figure. Focus moves to its heading on every step (which also
+// scrolls it into view); Escape ends the tour. Text comes from `tour.ts` only.
+import { useEffect, useId, useRef } from 'react';
+import type { KeyboardEvent, ReactElement } from 'react';
+import type { TourStep } from '../tour.js';
+
+export function TourCard(props: {
+  readonly step: TourStep;
+  readonly index: number; // a step position, not a financial value
+  readonly count: number;
+  readonly onBack: () => void;
+  readonly onNext: () => void;
+  readonly onEnd: () => void;
+}): ReactElement {
+  const titleId = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, [props.index]);
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      props.onEnd();
+    }
+  };
+  const last = props.index === props.count - 1;
+  return (
+    <section className="tour-card" aria-labelledby={titleId} onKeyDown={onKeyDown} data-testid="tour-card">
+      {/* Visual progress line; screen readers get the same words inside the heading, which is
+          where focus lands on every step (and which names the region, so it never duplicates
+          the name of the section it explains). */}
+      <p className="tour-progress" aria-hidden="true">
+        Guided tour · step {String(props.index + 1)} of {String(props.count)}
+      </p>
+      <h2 id={titleId} ref={heading} tabIndex={-1}>
+        <span className="visually-hidden">
+          Guided tour, step {String(props.index + 1)} of {String(props.count)}:{' '}
+        </span>
+        {props.step.title}
+      </h2>
+      {props.step.body.map((line) => (
+        <p key={line} className="tour-line">
+          {line}
+        </p>
+      ))}
+      <div className="tour-actions">
+        <button type="button" onClick={props.onBack} disabled={props.index === 0}>
+          Back
+        </button>
+        <button type="button" onClick={last ? props.onEnd : props.onNext} data-testid="tour-next">
+          {last ? 'Finish' : 'Next'}
+        </button>
+        <button type="button" className="tour-end" onClick={props.onEnd} data-testid="tour-end">
+          End tour
+        </button>
+      </div>
+    </section>
+  );
+}

@@ -74,6 +74,9 @@ export function TopBar(props: {
   readonly data: DashboardViewResponse | undefined;
   /** LIVE mode: why the last automatic view refresh failed (the previous view stays shown). */
   readonly refreshError?: LoadError | undefined;
+  /** Starts the guided tour, or ends it when it is running. */
+  readonly onTour: () => void;
+  readonly tourActive: boolean;
 }): ReactElement {
   const { data } = props;
   return (
@@ -101,6 +104,17 @@ export function TopBar(props: {
         </select>
         <button type="button" onClick={props.onReload}>
           Reload
+        </button>
+        {/* Guided tour (ui-guidelines §8): optional, user-started; pressed while running. */}
+        <button
+          type="button"
+          id="tour-start"
+          onClick={props.onTour}
+          aria-pressed={props.tourActive}
+          disabled={data === undefined}
+          data-testid="tour-start"
+        >
+          Guided tour
         </button>
       </div>
       <dl className="topbar-facts" aria-label="Data status">

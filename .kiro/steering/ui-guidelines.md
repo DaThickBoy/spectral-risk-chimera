@@ -8,11 +8,27 @@ The Spectral Risk Chimera dashboard is an institutional financial terminal. It s
 
 ## 1. Visual style
 
-- Dark theme only in version 1. Use near-black neutral surfaces, not pure black: background `#0B0E13`, panels `#12161D`, raised panels `#1A1F28`, borders `#262C36`.
+Design direction (approved for the hackathon experience pass): a premium institutional risk-analytics platform. It is calm and precise, never a crypto trading terminal.
+
+- Dark theme only in version 1. The foundation is charcoal and deep navy, in restrained layers:
+
+  | Token | Value | Use |
+  |---|---|---|
+  | `--color-bg` | `#0B0E13` | Page background (charcoal) |
+  | `--color-panel` | `#12161D` | Panels and sections |
+  | `--color-panel-navy` | `#101A29` | Headline surfaces: top bar and portfolio summary |
+  | `--color-raised` | `#18202E` | Raised navy layer: primary panel, table headers, controls, help panels |
+  | `--color-border` | `#232D3C` | Default 1px borders |
+  | `--color-border-strong` | `#34435A` | Primary panel and headline borders |
+
 - Text: primary `#E6E9EF`, secondary `#9AA3B2`, muted `#6B7482`. Never use muted text for data values.
-- One restrained accent for interaction and focus (`#4C8DFF`). Do not use the accent for data meaning.
+- One interaction accent: teal `#2EC4B6` (`--color-accent`), for focus rings, hover, and selected or active controls only. Do not use it for data meaning, and do not add a second interaction accent.
+- Informational blue `#4C8DFF` (`--color-info`): neutral provenance and information only, such as `DEMO` badges, the DEMO notice, and informational badges. It is never an interaction colour and never a risk signal.
+- Amber (`--color-warning`) is only for meaningful warnings and stale data. Never use it decoratively or for DEMO.
+- Red (`--color-negative`, `--color-critical`) is only for genuine errors (for example a failed data load) and adverse risk states.
 - Flat surfaces with 1px borders. No gradients, glows, glassmorphism, or heavy shadows.
 - Define all colours, spacing, and type sizes as design tokens (CSS variables). Do not hardcode hex values in components.
+- Text and badges keep at least 4.5:1 contrast on every surface token. The stylesheet test checks text, warning, accent, info, and critical tokens against each surface.
 
 ## 2. Typography and numbers
 
@@ -25,7 +41,8 @@ The Spectral Risk Chimera dashboard is an institutional financial terminal. It s
 
 ## 3. Information hierarchy
 
-- Top bar: portfolio, base currency, NAV, data as-of time, connection and provider status.
+- Top bar: identity, portfolio selection, data mode, source, and run mode; in LIVE mode, connection and provider status.
+- Portfolio summary directly below it: NAV and Base VaR as the two largest figures, then exposures and cash, with the data mode, freshness, and as-of time.
 - Primary row: four separate panels in this order: Base VaR, Sentiment-Adjusted VaR, Market Sentiment, SEC Filing Risk (R35.1). Never merge them into one gauge or score.
 - Then positions and allocation table, then charts, then alerts and audit detail.
 - Each panel header states what the value is, its parameters, and its time: for example `Adjusted VaR · 1 day · 95% · as of 2026-11-06`.
@@ -52,7 +69,7 @@ Data status badges, always visible beside the value:
 | Current | `CURRENT` (subtle, secondary text) |
 | Stale | `STALE` + age, warning colour |
 | Unavailable | `UNAVAILABLE`, value shown as `—` (never `0`) |
-| Demo | `DEMO` in a distinct outlined badge, on every demo value |
+| Demo | `DEMO` in a distinct dashed, outlined badge in informational blue, on every demo value (never amber: DEMO is provenance, not a warning) |
 | Last valid | `LAST VALID` + timestamp |
 
 Rules:
@@ -89,10 +106,27 @@ Charts use `toChartNumber()` only for plotting. Labels and tooltips use the deci
 - Provide accessible names for icons, badges, and charts (`aria-label`).
 - Alerts appear in a dedicated panel with severity, type (`VAR` or `FILING_RISK`), metric, observed value, threshold, and time. Do not use modal pop-ups that block the data.
 - Confirm destructive or configuration actions. Never trigger trades: this is a monitoring tool.
+- Control states: hover and selected or active controls use the teal accent border. Disabled controls use muted text and the default border, with `not-allowed` cursor, and are never the only way to explain why an action is unavailable.
+
+## 8. Guided tour
+
+An optional, short walkthrough for judges and first-time viewers.
+
+- Started only by the user (a "Guided tour" control in the top bar). It never opens by itself.
+- Non-modal. Each step is an inline card placed directly above the section it explains, so it never overlays a figure. Back, Next (Finish on the last step), and End tour; Escape ends it, and focus returns to the start control.
+- Screen-reader step context: focus moves to each step's heading. The heading starts with visually hidden text, so its accessible name is "Guided tour, step N of M: <visible step title>" (for example "Guided tour, step 3 of 6: Base VaR"). The step card is a region named by that heading, so the name is unique on the page and never duplicates the section it explains (axe `landmark-unique`).
+- The visible progress line ("Guided tour · step N of M") is `aria-hidden`, so the step position is not announced twice. The focused heading carries the step context.
+- Uses only backend display text (for example the NAV and Base VaR strings) and static wording consistent with the glossary. It computes, rounds, or invents nothing.
+- Wording matches the source: the recorded replay is described as a recorded DEMO replay, never as a live or production service.
+
+## 9. Exact values and future display policy
+
+- Exact backend values (for example the full-precision share of NAV and raw quantile) are shown in full. They are never rounded or truncated in the browser.
+- A compact display (a short value with the exact one on demand) needs a separate, approved display-policy decision. The backend would have to supply the compact text, because the UI must not round.
 
 ## Checklist
 
-- [ ] Dark theme using design tokens; one accent colour.
+- [ ] Charcoal and navy surfaces from design tokens; one teal interaction accent; blue only informational; amber only warnings and stale data; red only errors and adverse risk.
 - [ ] Numbers in tabular figures, right-aligned, with units.
 - [ ] Four risk dimensions shown as separate panels with parameters and timestamps.
 - [ ] Positive, negative, warning, high, and critical states use colour plus text label.

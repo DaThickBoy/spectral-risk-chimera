@@ -175,55 +175,60 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
             (raw quantile, unrounded). Scenarios with a larger loss than the marker:{' '}
             {String(dist.varMarker.scenariosAbove)}. Not a forecast and not the worst possible loss.
           </p>
-          <div
-            className="table-wrap"
-            role="region"
-            aria-label="Loss distribution table, scrollable"
-            tabIndex={0}
-          >
-            <table data-testid="loss-table">
-              <caption>
-                Every bucket with exact edges in {dist.currency}; lower edges are included, upper edges are
-                excluded except in the last bucket
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="num">
-                    Bucket
-                  </th>
-                  <th scope="col" className="num">
-                    Lower ({dist.currency})
-                  </th>
-                  <th scope="col" className="num">
-                    Upper ({dist.currency})
-                  </th>
-                  <th scope="col">Upper edge</th>
-                  <th scope="col" className="num">
-                    Scenarios (count)
-                  </th>
-                  <th scope="col">VaR marker</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dist.buckets.map((bucket, index) => (
-                  <tr key={bucket.lower}>
-                    <th scope="row" className="num">
-                      {String(index + 1)}
+          {/* Progressive disclosure (ui-guidelines §3): the summary above and the chart's own
+              description stay visible; the exact bucket table is one native disclosure away. */}
+          <details className="disclosure" data-testid="loss-table-details">
+            <summary>Exact bucket table ({String(dist.bucketCount)} buckets)</summary>
+            <div
+              className="table-wrap"
+              role="region"
+              aria-label="Loss distribution table, scrollable"
+              tabIndex={0}
+            >
+              <table data-testid="loss-table">
+                <caption>
+                  Every bucket with exact edges in {dist.currency}; lower edges are included, upper edges are
+                  excluded except in the last bucket
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="num">
+                      Bucket
                     </th>
-                    <td className="num">{bucket.lower}</td>
-                    <td className="num">{bucket.upper}</td>
-                    <td>{bucket.upperInclusive ? 'included' : 'excluded'}</td>
-                    <td className="num">{String(bucket.count)}</td>
-                    <td>
-                      {index === dist.varMarker.bucketIndex
-                        ? `VaR ${confidencePct(dist.confidence)} at ${dist.varMarker.rawQuantile}`
-                        : ''}
-                    </td>
+                    <th scope="col" className="num">
+                      Lower ({dist.currency})
+                    </th>
+                    <th scope="col" className="num">
+                      Upper ({dist.currency})
+                    </th>
+                    <th scope="col">Upper edge</th>
+                    <th scope="col" className="num">
+                      Scenarios (count)
+                    </th>
+                    <th scope="col">VaR marker</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {dist.buckets.map((bucket, index) => (
+                    <tr key={bucket.lower}>
+                      <th scope="row" className="num">
+                        {String(index + 1)}
+                      </th>
+                      <td className="num">{bucket.lower}</td>
+                      <td className="num">{bucket.upper}</td>
+                      <td>{bucket.upperInclusive ? 'included' : 'excluded'}</td>
+                      <td className="num">{String(bucket.count)}</td>
+                      <td>
+                        {index === dist.varMarker.bucketIndex
+                          ? `VaR ${confidencePct(dist.confidence)} at ${dist.varMarker.rawQuantile}`
+                          : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
         </>
       )}
     </section>

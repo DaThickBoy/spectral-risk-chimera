@@ -263,6 +263,47 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     await page.goto(BASE);
     await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
   });
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`guided tour on the recorded replay at ${String(viewport.width)} px: keyboard, six steps, no overflow`, async ({
+      page,
+    }) => {
+      const w = watch(page);
+      await page.setViewportSize(viewport);
+      await page.goto(BASE);
+      await expect(page.getByTestId('summary-nav')).toHaveText('22375.74 EUR');
+      await expect(page.getByTestId('tour-card')).toHaveCount(0); // never starts by itself
+      await page.getByTestId('tour-start').focus();
+      await page.keyboard.press('Enter');
+      const card = page.getByTestId('tour-card');
+      await expect(card).toContainText('Guided tour · step 1 of 6');
+      await expect(card).toContainText('recorded DEMO replay');
+      await expect(card).toContainText('recorded 2026-11-06 16:00 UTC');
+      await expect(card.getByRole('heading', { name: 'The portfolio' })).toBeFocused();
+      for (const title of [
+        'NAV',
+        'Base VaR',
+        'Allocation and currency exposure',
+        'Loss distribution and the VaR marker',
+        'Unavailable and DEMO',
+      ]) {
+        await page.getByTestId('tour-next').click();
+        await expect(card.getByRole('heading', { name: title })).toBeFocused();
+        await expect(card).toBeInViewport();
+        const overflow = await page.evaluate('document.documentElement.scrollWidth - window.innerWidth');
+        expect(overflow, title).toBeLessThanOrEqual(0);
+      }
+      await expect(card).toContainText('open decision OD-1');
+      await page.keyboard.press('Escape');
+      await expect(card).toHaveCount(0);
+      await expect(page.getByTestId('tour-start')).toBeFocused();
+      await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+      expectClean(w);
+    });
+  }
 });
 
 test.describe('states', () => {
