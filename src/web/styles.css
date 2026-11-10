@@ -234,6 +234,8 @@ button:disabled:hover {
   padding: var(--space-3) var(--space-4);
   margin: 0 0 var(--space-4);
   max-width: 46rem;
+  /* Breathing room when a step is scrolled into view, so it never touches the viewport edge. */
+  scroll-margin: var(--space-4);
 }
 
 /* Text for assistive technology only (standard clip pattern; stays in the accessibility tree). */
@@ -324,6 +326,34 @@ button:disabled:hover {
   font-size: var(--size-metric);
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+/* Judge review: NAV and Base VaR read as one run of numbers. NAV stays the primary figure;
+   Base VaR (the second primary figure) sits behind a hairline divider, one step down the
+   existing metric scale. Surface and border tokens only, never a data colour. */
+.summary-primary + .summary-primary {
+  padding-left: var(--space-5);
+  border-left: 1px solid var(--color-border-strong);
+}
+
+.summary-primary + .summary-primary dd {
+  font-size: var(--size-metric-secondary);
+}
+
+/* An open help panel makes a figure take the whole row, so Base VaR starts its own line:
+   no divider there either. */
+.summary-primary + .summary-primary:has(.help-panel),
+.summary-primary:has(.help-panel) + .summary-primary {
+  padding-left: 0;
+  border-left: 0;
+}
+
+@media (max-width: 760px) {
+  /* Stacked on narrow screens: no divider, the figures separate by their own rows. */
+  .summary-primary + .summary-primary {
+    padding-left: 0;
+    border-left: 0;
+  }
 }
 
 /* Allocation chart (S2): fixed 0–100 % axis, text first, bars as a visual aid. */
