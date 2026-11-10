@@ -117,6 +117,26 @@ test.describe('390 px phone viewport', () => {
       '({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth })',
     );
     expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.innerWidth);
+    // The top bar's items stay inside its own content box. This does not depend on fonts: with
+    // narrow fonts an overflowing top-bar item is hidden by the page padding, so the page-level
+    // check above only fails where the fonts are wider (for example the Linux CI runner).
+    const bar = await inPage<{ contentRight: number; items: { item: string; right: number }[] }>(
+      page,
+      `(() => {
+        const bar = document.querySelector('header.topbar');
+        const s = getComputedStyle(bar);
+        const contentRight =
+          bar.getBoundingClientRect().right - parseFloat(s.borderRightWidth) - parseFloat(s.paddingRight);
+        const items = Array.from(bar.children).map((c) => ({
+          item: c.tagName.toLowerCase() + '.' + c.className,
+          right: c.getBoundingClientRect().right,
+        }));
+        return { contentRight, items };
+      })()`,
+    );
+    for (const item of bar.items) {
+      expect(item.right, item.item).toBeLessThanOrEqual(bar.contentRight + 0.5);
+    }
     await expect(page.locator('.panels h2')).toHaveText([
       'Base VaR',
       'Sentiment-Adjusted VaR',

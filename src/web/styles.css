@@ -142,6 +142,7 @@ select:hover {
 
 .topbar-controls {
   display: flex;
+  flex-wrap: wrap; /* on narrow screens the select and Reload move to their own line, never past the bar */
   align-items: center;
   gap: var(--space-2);
 }
