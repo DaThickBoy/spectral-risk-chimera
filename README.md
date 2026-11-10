@@ -96,7 +96,7 @@ $env:SRC_DASHBOARD_BACKEND = "http://127.0.0.1:8080"
 npm run dev:web
 ```
 
-Open the URL Vite prints (`http://127.0.0.1:5173/`). Vite proxies `/dashboard` to the backend.
+Open the URL Vite prints (`http://127.0.0.1:5173/`). Vite proxies `/dashboard` and the read-only `/stream` WebSocket to the backend. For live updates, start the backend with `--allowed-origin http://127.0.0.1:5173`: the stream accepts only listed origins. Risk updates then refresh the shown view, at most once per animation frame. Sentiment updates change only their ticker, and the top bar shows the stream and provider state. The public replay has no stream.
 
 ### Recorded replay (what GitHub Pages serves)
 

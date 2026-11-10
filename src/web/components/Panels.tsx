@@ -3,8 +3,13 @@
 // Every figure is backend text; nothing is calculated here.
 import type { ReactElement, ReactNode } from 'react';
 import type { DashboardViewResponse } from '../../shared/apiContracts/index.js';
+import { newerSentiment } from '../data/liveUpdates.js';
+import type { SentimentDisplay } from '../data/liveUpdates.js';
 import { MISSING, codeLabel, confidencePct, utcText, withUnit } from '../format.js';
+import { useLiveSentiment } from '../live.tsx';
+import type { GlossaryKey } from '../glossary.js';
 import { Badge, toneOf } from './Badge.tsx';
+import { Help } from './Help.tsx';
 
 type View = DashboardViewResponse;
 
@@ -12,13 +17,25 @@ function Panel(props: {
   readonly id: string;
   readonly title: string;
   readonly params: string;
+  /** S4: contextual help next to the parameters (outside the heading, so its name stays clean). */
+  readonly help?: GlossaryKey;
+  /** S5: visual weight only. `primary` for the headline risk figure; `compact` for status-only panels. */
+  readonly tier?: 'primary' | 'compact';
   readonly children: ReactNode;
 }): ReactElement {
+  const tierClass = props.tier === undefined ? '' : ` panel-${props.tier}`;
   return (
-    <section className="panel" aria-labelledby={`${props.id}-title`}>
+    <section
+      className={`panel${tierClass}`}
+      aria-labelledby={`${props.id}-title`}
+      data-testid={`panel-${props.id}`}
+    >
       <header className="panel-header">
         <h2 id={`${props.id}-title`}>{props.title}</h2>
-        <p className="panel-params">{props.params}</p>
+        <p className="panel-params">
+          {props.params}
+          {props.help === undefined ? null : <Help term={props.help} />}
+        </p>
       </header>
       {props.children}
     </section>
@@ -33,6 +50,8 @@ export function BaseVarPanel({ data }: { readonly data: View }): ReactElement {
       id="base-var"
       title="Base VaR"
       params={`1 day · ${confidencePct(data.view.confidence)} · Historical Simulation · as of ${data.freshness.asOfDate ?? MISSING}`}
+      help="confidence"
+      tier="primary"
     >
       <p className="metric" data-testid="base-var-value">
         {withUnit(data.display.baseVaR, currency)}
@@ -54,7 +73,10 @@ export function BaseVarPanel({ data }: { readonly data: View }): ReactElement {
         <dl className="facts">
           <dt>Share of NAV (exact)</dt>
           <dd className="num">{withUnit(base.value.percentOfNav, '%')}</dd>
-          <dt>Raw quantile loss (exact)</dt>
+          <dt>
+            Raw quantile loss (exact)
+            <Help term="rawQuantile" />
+          </dt>
           <dd className="num">{withUnit(base.value.rawQuantile, currency)}</dd>
         </dl>
       )}
@@ -80,6 +102,8 @@ export function AdjustedVarPanel({ data }: { readonly data: View }): ReactElemen
       id="adjusted-var"
       title="Sentiment-Adjusted VaR"
       params={`1 day · ${confidencePct(data.view.confidence)} · as of ${data.freshness.asOfDate ?? MISSING}`}
+      help="adjustedVar"
+      {...(adjusted.value === null ? { tier: 'compact' as const } : {})}
     >
       {adjusted.value === null ? (
         <>
@@ -94,11 +118,18 @@ export function AdjustedVarPanel({ data }: { readonly data: View }): ReactElemen
                 label={`${codeLabel(availability.reasonCode)} · ${availability.openDecision ?? ''}`}
               />
             ) : null}
-            <Badge tone="neutral" label={codeLabel(adjusted.status)} />
           </p>
-          <p className="reason" data-testid="adjusted-var-reason">
-            {availability.explanation}
-          </p>
+          {/* S5: the concise status stays visible; the engine status and full reason are one
+              native disclosure away (keyboard: Tab to the summary, Enter or Space toggles). */}
+          <details className="disclosure" data-testid="adjusted-var-details">
+            <summary>Why it is unavailable</summary>
+            <p className="badges">
+              <Badge tone="neutral" label={codeLabel(adjusted.status)} />
+            </p>
+            <p className="reason" data-testid="adjusted-var-reason">
+              {availability.explanation}
+            </p>
+          </details>
         </>
       ) : (
         <>
@@ -121,6 +152,27 @@ const SENTIMENT_BASIS: Readonly<Record<string, string>> = {
   LATEST_OBSERVATION: 'latest observation, not an aggregated index',
 };
 
+/**
+ * One ticker's sentiment. In LIVE mode it subscribes to that ticker only (task 17.4), and shows
+ * the newer of the view's value and the streamed one, exactly as the backend sent it.
+ */
+function SentimentRow(props: { readonly ticker: string; readonly fromView: SentimentDisplay }): ReactElement {
+  const sentiment = newerSentiment(props.fromView, useLiveSentiment(props.ticker));
+  const basis = SENTIMENT_BASIS[sentiment.basis];
+  return (
+    <li data-testid={`sentiment-${props.ticker}`}>
+      <span className="ticker">{props.ticker}</span> <span className="num">{sentiment.value ?? MISSING}</span>{' '}
+      <Badge tone={toneOf(sentiment.status)} label={sentiment.status} />
+      {sentiment.sourceKind === 'DEMO' ? <Badge tone="demo" label="DEMO" /> : null}
+      {basis === undefined ? null : (
+        <span className="muted-block">
+          {basis} · observed {utcText(sentiment.observedAt)}
+        </span>
+      )}
+    </li>
+  );
+}
+
 export function SentimentPanel({ data }: { readonly data: View }): ReactElement {
   return (
     <Panel
@@ -129,22 +181,9 @@ export function SentimentPanel({ data }: { readonly data: View }): ReactElement 
       params={`Sentiment index, -1 (bearish) to +1 (bullish) · as of ${utcText(data.generatedAt)}`}
     >
       <ul className="plain-list">
-        {data.view.assets.map((asset) => {
-          const basis = SENTIMENT_BASIS[asset.sentiment.basis];
-          return (
-            <li key={asset.ticker} data-testid={`sentiment-${asset.ticker}`}>
-              <span className="ticker">{asset.ticker}</span>{' '}
-              <span className="num">{asset.sentiment.value ?? MISSING}</span>{' '}
-              <Badge tone={toneOf(asset.sentiment.status)} label={asset.sentiment.status} />
-              {asset.sentiment.sourceKind === 'DEMO' ? <Badge tone="demo" label="DEMO" /> : null}
-              {basis === undefined ? null : (
-                <span className="muted-block">
-                  {basis} · observed {utcText(asset.sentiment.observedAt)}
-                </span>
-              )}
-            </li>
-          );
-        })}
+        {data.view.assets.map((asset) => (
+          <SentimentRow key={asset.ticker} ticker={asset.ticker} fromView={asset.sentiment} />
+        ))}
       </ul>
       <p className="caption">
         Scale: -1 bearish to +1 bullish. Shown separately from filing risk; never combined.
@@ -159,13 +198,14 @@ export function FilingPanel({ data }: { readonly data: View }): ReactElement {
       id="filing"
       title="SEC Filing Risk"
       params={`Filing risk score, 0 (low) to 1 (high) · as of ${MISSING} (not configured)`}
+      tier="compact"
     >
-      <p className="metric metric-unavailable">{MISSING}</p>
-      <p className="badges">
+      {/* S5: one compact status row. No score, no controls, nothing that suggests the feature runs. */}
+      <p className="status-row" data-testid="filing-status">
+        <span className="metric metric-unavailable">{MISSING}</span>
         <Badge tone="unavailable" label={codeLabel(data.filing.status)} />
       </p>
-      <p className="reason">{data.filing.explanation}</p>
-      <p className="caption">Scale: 0 low to 1 high. Never combined with market sentiment.</p>
+      <p className="caption">{data.filing.explanation} Never combined with market sentiment.</p>
     </Panel>
   );
 }

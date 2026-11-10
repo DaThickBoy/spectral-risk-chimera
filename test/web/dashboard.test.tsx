@@ -74,10 +74,11 @@ describe('panels and data mode (AT-DSH-01, AT-DSH-15)', () => {
     const bar = text(container.querySelector('.topbar') as HTMLElement);
     expect(bar).toContain('DEMO DATA');
     expect(bar).toContain('DEMO FIXTURES');
-    expect(bar).toContain('22375.74 EUR');
-    expect(bar).toContain('2026-11-06');
-    expect(bar).toContain('2026-11-06 16:00 UTC');
-    expect(bar).toContain('CURRENT');
+    // S1: NAV, as-of, calculation time, and freshness moved to the headline summary.
+    expect(bar).not.toContain('22375.74 EUR');
+    const summary = text(container.querySelector('[data-testid="summary"]') as HTMLElement);
+    expect(summary).toContain('market data as of 2026-11-06 · calculated 2026-11-06 16:00 UTC');
+    expect(summary).toContain('CURRENT');
     expect(text(container)).toContain('DEMO DATA: prices and history are deterministic fixtures');
   });
 });
@@ -141,13 +142,11 @@ describe('panel times, provenance labels, and DEMO badges (ui-guidelines 3 and 4
     expect(adjusted.querySelector('[data-testid="adjusted-var-value"]')?.textContent).toBe('Unavailable');
   });
 
-  it('DEMO data is labelled on the NAV, the overview, and the currency exposure', async () => {
+  it('DEMO data is labelled on the headline summary and the currency exposure', async () => {
     const { container } = await show();
-    // textContent includes the badge's decorative (aria-hidden) icon glyph.
-    expect(text(container.querySelector('[data-testid="topbar-nav"]') as HTMLElement)).toMatch(
-      /^22375\.74 EUR .?DEMO$/,
+    expect(text(container.querySelector('[data-testid="summary-badges"]') as HTMLElement)).toContain(
+      'DEMO DATA',
     );
-    expect(text(container.querySelector('[data-testid="overview-badges"]') as HTMLElement)).toContain('DEMO');
     expect(text(container.querySelector('[data-testid="ccy-badges"]') as HTMLElement)).toContain('DEMO');
   });
 
@@ -193,6 +192,174 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
     expect(ccy).toContain('5726.32 EUR');
   });
 
+  it('S1 summary: NAV and Base VaR (1 day, 95%) first, then exposure and cash, as backend text', async () => {
+    const { container } = await show();
+    const value = (id: string) => container.querySelector(`[data-testid="summary-${id}"]`)?.textContent;
+    expect(value('nav')).toBe('22375.74 EUR');
+    expect(value('base-var')).toBe('124.10 EUR');
+    expect(value('gross')).toBe('21375.74 EUR');
+    expect(value('net')).toBe('21375.74 EUR');
+    expect(value('long')).toBe('21375.74 EUR');
+    expect(value('short')).toBe('0.00 EUR'); // a genuine zero from the backend, not a placeholder
+    expect(value('cash')).toBe('1000.00 EUR');
+    const summary = container.querySelector('[data-testid="summary"]') as HTMLElement;
+    expect(text(summary)).toContain('Base VaR · 1 day · 95%');
+    expect(text(summary)).toContain('CURRENT');
+    expect(text(summary)).not.toMatch(/%\s*of NAV|% NAV/); // no VaR share of NAV in the headline
+    // The summary comes directly after the top bar, before the risk panels.
+    const main = container.querySelector('main') as HTMLElement;
+    expect(main.querySelector('section')?.getAttribute('data-testid')).toBe('summary');
+  });
+
+  it('S1 summary: unavailable figures are "—" with their badges; cash stays the backend value', async () => {
+    const { container } = await show(fxProblemView());
+    const value = (id: string) => container.querySelector(`[data-testid="summary-${id}"]`)?.textContent;
+    for (const id of ['nav', 'base-var', 'gross', 'net', 'long', 'short'])
+      expect(value(id), id).toBe('\u2014');
+    expect(value('cash')).toBe('1000.00 EUR');
+    const badges = text(container.querySelector('[data-testid="summary-badges"]') as HTMLElement);
+    expect(badges).toContain('FX UNAVAILABLE');
+    expect(badges).toContain('EXPOSURE UNAVAILABLE');
+    expect(text(container.querySelector('[data-testid="summary"]') as HTMLElement)).toContain('UNAVAILABLE');
+  });
+
+  it('S1 summary: stale inputs and a stale Base VaR are labelled STALE, with the value kept', async () => {
+    const base = multiCurrencyView();
+    const stale = DashboardViewResponseSchema.parse({
+      ...base,
+      view: { ...base.view, baseVaR: { ...base.view.baseVaR, validity: 'STALE' } },
+      freshness: { ...base.freshness, summary: 'STALE_INPUTS' },
+    });
+    const { container } = await show(stale);
+    const summary = text(container.querySelector('[data-testid="summary"]') as HTMLElement);
+    expect(summary).toContain('STALE INPUTS');
+    // The badge's decorative (aria-hidden) icon glyph sits between the label and its text.
+    expect(summary).toMatch(/Base VaR · 1 day · 95%\s?.?STALE/);
+    expect(container.querySelector('[data-testid="summary-base-var"]')?.textContent).toBe('124.10 EUR');
+  });
+
+  describe('S2 allocation chart', () => {
+    const row = (container: HTMLElement, ticker: string) =>
+      container.querySelector(`[data-testid="allocation-${ticker}"]`) as HTMLElement;
+    const width = (container: HTMLElement, ticker: string) =>
+      (row(container, ticker).querySelector('.allocation-bar') as HTMLElement | null)?.style.width;
+
+    it('one bar per position with the exact backend percentage, matching the table, DEMO labelled', async () => {
+      const { container } = await show();
+      const chart = container.querySelector('[data-testid="allocation-chart"]') as HTMLElement;
+      expect(text(chart)).toContain('Allocation by position');
+      expect(text(chart)).toContain('DEMO');
+      expect(text(row(container, 'DEMO-EU'))).toBe('DEMO-EU40.20%');
+      expect(text(row(container, 'DEMO-UK'))).toBe('DEMO-UK29.74%');
+      expect(width(container, 'DEMO-EU')).toBe('40.2%');
+      expect(width(container, 'DEMO-US')).toBe('25.59%');
+      // The bars are decorative; the text carries the values for screen readers.
+      expect(row(container, 'DEMO-EU').querySelector('.allocation-track')?.getAttribute('aria-hidden')).toBe(
+        'true',
+      );
+      // The positions table states the same values.
+      const table = text(
+        container
+          .querySelector('#positions-title')
+          ?.closest('section')
+          ?.querySelector('table') as HTMLElement,
+      );
+      for (const pct of ['40.20%', '29.74%', '25.59%']) expect(table).toContain(pct);
+    });
+
+    it('a zero allocation is a real 0.00% with a zero-length bar; a missing one has no bar and its status', async () => {
+      const base = multiCurrencyView();
+      const [eu, uk, us] = base.view.assets;
+      if (eu === undefined || uk === undefined || us === undefined) throw new Error('fixture');
+      const mixed = DashboardViewResponseSchema.parse({
+        ...base,
+        view: {
+          ...base.view,
+          assets: [
+            { ...eu, allocationPct: '0' },
+            { ...uk, allocationPct: null, valuationStatus: 'FX_STALE' },
+            us,
+          ],
+        },
+      });
+      const { container } = await show(mixed);
+      expect(text(row(container, 'DEMO-EU'))).toBe('DEMO-EU0.00%');
+      expect(width(container, 'DEMO-EU')).toBe('0%');
+      expect(text(row(container, 'DEMO-UK'))).toMatch(/^DEMO-UK\u2014 .?FX STALE$/);
+      expect(width(container, 'DEMO-UK')).toBeUndefined(); // never drawn as zero
+      expect(width(container, 'DEMO-US')).toBe('25.59%');
+    });
+
+    it('with no allocation at all, nothing is plotted and the reason is stated', async () => {
+      const { container } = await show(fxProblemView());
+      expect(container.querySelector('[data-testid="allocation-unavailable"]')?.textContent).toContain(
+        'No allocation is available for this portfolio',
+      );
+      expect(container.querySelector('.allocation-bar')).toBeNull();
+    });
+  });
+
+  describe('S3 currency exposure chart', () => {
+    const row = (container: HTMLElement, ccy: string) =>
+      container.querySelector(`[data-testid="exposure-${ccy}"]`) as HTMLElement;
+    const bar = (container: HTMLElement, ccy: string) =>
+      row(container, ccy).querySelector('.allocation-bar') as HTMLElement | null;
+
+    it('one bar per currency in backend order, labelled with the backend display text in EUR', async () => {
+      const { container } = await show();
+      const chart = container.querySelector('[data-testid="exposure-chart"]') as HTMLElement;
+      expect(text(chart)).toContain('Exposure by currency, in EUR');
+      expect(text(chart)).toContain('axis 0 to gross exposure (21375.74 EUR)');
+      expect(text(chart)).toContain('DEMO');
+      const order = [...chart.querySelectorAll('[data-testid^="exposure-"]')]
+        .map((e) => e.getAttribute('data-testid'))
+        .filter((id) => id !== 'exposure-chart');
+      expect(order).toEqual(['exposure-EUR', 'exposure-GBP', 'exposure-USD']); // as sent by the backend
+      expect(text(row(container, 'EUR'))).toBe('EUR8994.29 EUR');
+      expect(text(row(container, 'GBP'))).toBe('GBP6655.13 EUR');
+      // Bar length is the value over the backend's gross exposure (geometry only).
+      expect(Number.parseFloat(bar(container, 'EUR')?.style.width ?? '')).toBeCloseTo(42.08, 1);
+      expect(bar(container, 'EUR')?.classList.contains('bar-negative')).toBe(false);
+    });
+
+    it('zero is a real 0.00 EUR with a zero-length bar; a negative value is an outlined bar with its sign', async () => {
+      const base = multiCurrencyView();
+      const variant = DashboardViewResponseSchema.parse({
+        ...base,
+        currencyExposure: [
+          { ...base.currencyExposure[0], marketValueBase: '0' },
+          { ...base.currencyExposure[1], marketValueBase: '-500' },
+          base.currencyExposure[2],
+        ],
+        display: {
+          ...base.display,
+          currencyExposure: [
+            { currency: 'EUR', marketValueBase: '0.00' },
+            { currency: 'GBP', marketValueBase: '-500.00' },
+            { currency: 'USD', marketValueBase: '5726.32' },
+          ],
+        },
+      });
+      const { container } = await show(variant);
+      expect(text(row(container, 'EUR'))).toBe('EUR0.00 EUR');
+      expect(bar(container, 'EUR')?.style.width).toBe('0%');
+      expect(text(row(container, 'GBP'))).toBe('GBP-500.00 EUR');
+      expect(bar(container, 'GBP')?.classList.contains('bar-negative')).toBe(true);
+      expect(Number.parseFloat(bar(container, 'GBP')?.style.width ?? '')).toBeGreaterThan(0);
+    });
+
+    it('unavailable values have no bar and keep their status; without gross exposure nothing is plotted', async () => {
+      const { container } = await show(fxProblemView());
+      expect(text(row(container, 'GBP'))).toMatch(/^GBP\u2014 .?UNAVAILABLE$/);
+      expect(text(row(container, 'USD'))).toMatch(/^USD\u2014 .?UNAVAILABLE$/);
+      expect(text(row(container, 'EUR'))).toBe('EUR8994.29 EUR'); // the value stays visible
+      expect(container.querySelector('[data-testid="exposure-chart"] .allocation-bar')).toBeNull();
+      expect(container.querySelector('[data-testid="exposure-no-axis"]')?.textContent).toContain(
+        'Gross exposure is unavailable',
+      );
+    });
+  });
+
   it('percentText pads only', () => {
     expect(percentText('33.3')).toBe('33.30%');
     expect(percentText('100')).toBe('100.00%');
@@ -209,11 +376,12 @@ describe('stale and unavailable data (AT-DSH-09, AT-DSH-10)', () => {
     expect(fx).toContain('UNAVAILABLE');
     expect(fx).toContain('PROVIDER ERROR');
     expect(container.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('\u2014');
-    const overview = text(container.querySelector('#overview-title')?.closest('section') as HTMLElement);
-    expect(overview).toContain('NAV\u2014');
-    expect(overview).toContain('EXPOSURE UNAVAILABLE');
-    expect(overview).not.toMatch(/NAV0/);
-    expect(text(container.querySelector('.topbar') as HTMLElement)).toContain('FX UNAVAILABLE');
+    const summary = text(container.querySelector('[data-testid="summary"]') as HTMLElement);
+    // S4: the NAV help trigger ("?") sits between the label and the value.
+    expect(summary).toMatch(/NAV\??\u2014/);
+    expect(summary).toContain('EXPOSURE UNAVAILABLE');
+    expect(summary).toContain('FX UNAVAILABLE');
+    expect(summary).not.toMatch(/NAV\??0/);
     expect(text(container.querySelector('#base-var-title')?.closest('section') as HTMLElement)).toContain(
       'Unavailable: FX UNAVAILABLE',
     );
@@ -299,11 +467,12 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
   const section = (container: HTMLElement): HTMLElement =>
     container.querySelector('[data-testid="loss-distribution"]') as HTMLElement;
 
-  it('sits after the positions and before the FX rates', async () => {
+  it('sits after the positions and before the currency exposure and FX rates (S5 order)', async () => {
     const { container } = await show();
     const titles = [...container.querySelectorAll('main h2')].map((h) => h.id);
     expect(titles.indexOf('loss-title')).toBe(titles.indexOf('positions-title') + 1);
-    expect(titles.indexOf('fx-title')).toBe(titles.indexOf('loss-title') + 1);
+    expect(titles.indexOf('ccy-title')).toBe(titles.indexOf('loss-title') + 1);
+    expect(titles.indexOf('fx-title')).toBe(titles.indexOf('loss-title') + 2);
   });
 
   it('states the metric, parameters, calculation time, validity, and DEMO label', async () => {
@@ -442,5 +611,82 @@ describe('accessibility and layout', () => {
       expect(table.querySelector('caption')?.textContent?.length).toBeGreaterThan(0);
       expect(table.querySelectorAll('th[scope="col"]').length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('S5 final polish', () => {
+  const panelEl = (container: HTMLElement, id: string) =>
+    container.querySelector(`[data-testid="panel-${id}"]`) as HTMLElement;
+
+  it('Adjusted VaR: concise visible status with OD-1; engine status and full reason in a closed native disclosure', async () => {
+    const { container } = await show();
+    const panel = panelEl(container, 'adjusted-var');
+    const visible = panel.querySelector('.badges') as HTMLElement;
+    expect(text(visible)).toContain('UNAVAILABLE');
+    expect(text(visible)).toContain('AGGREGATION NOT APPROVED · OD-1');
+    const details = panel.querySelector('[data-testid="adjusted-var-details"]');
+    expect(details).toBeInstanceOf(HTMLDetailsElement);
+    expect((details as HTMLDetailsElement).open).toBe(false);
+    expect(details?.querySelector('summary')?.textContent).toBe('Why it is unavailable');
+    expect(details?.querySelector('[data-testid="adjusted-var-reason"]')?.textContent).toContain(OD1_TEXT);
+    expect(text(details as HTMLElement)).toContain('ADJUSTMENT CONFIG MISSING'); // the engine status
+    expect(panel.className).toContain('panel-compact');
+  });
+
+  it('SEC filing: one compact status row with "—" and NOT CONFIGURED; no score and no controls', async () => {
+    const { container } = await show();
+    const panel = panelEl(container, 'filing');
+    const status = panel.querySelector('[data-testid="filing-status"]') as HTMLElement;
+    expect(status.querySelector('.metric')?.textContent).toBe('\u2014');
+    expect(text(status)).toContain('NOT CONFIGURED');
+    expect(panel.querySelectorAll('button, input, select, a, details')).toHaveLength(0);
+    expect(text(panel)).not.toMatch(/\b0(\.\d+)?\b(?! \(low\))/);
+    expect(panel.className).toContain('panel-compact');
+  });
+
+  it('Base VaR is the one primary panel; the four panels stay separate and in order', async () => {
+    const { container } = await show();
+    expect(
+      [...container.querySelectorAll('.panel-primary')].map((p) => p.getAttribute('data-testid')),
+    ).toEqual(['panel-base-var']);
+    expect(container.querySelectorAll('.panels > section.panel')).toHaveLength(4);
+  });
+
+  it('sections follow positions, loss distribution, currency exposure, then FX rates, each full width', async () => {
+    const { container } = await show();
+    const order = [...container.querySelectorAll('main section h2')].map((h) => h.id);
+    expect(order.slice(order.indexOf('positions-title'))).toEqual([
+      'positions-title',
+      'loss-title',
+      'ccy-title',
+      'fx-title',
+    ]);
+    // Visual review: at half width the exact FX rates wrapped into unreadable columns.
+    for (const id of ['ccy-title', 'fx-title']) {
+      expect(container.querySelector(`#${id}`)?.closest('section')?.parentElement?.tagName).toBe('MAIN');
+    }
+  });
+
+  it('heading hierarchy: one h1, every section and panel titled by an h2, no skipped levels', async () => {
+    const { container } = await show();
+    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    expect(container.querySelectorAll('h3, h4, h5, h6')).toHaveLength(0);
+    for (const section of container.querySelectorAll('main section')) {
+      const id = section.getAttribute('aria-labelledby') ?? '';
+      expect(container.querySelector(`#${id}`)?.tagName).toBe('H2');
+    }
+  });
+
+  it('the stylesheet keeps hierarchy in tokens and collapses the paired row on narrow screens', () => {
+    expect(css).toMatch(/--size-metric-secondary: 20px/);
+    expect(css).toMatch(/\.panel-primary \{[^}]*var\(--color-raised\)[^}]*var\(--color-border-strong\)/);
+    expect(css).toMatch(/@media \(max-width: 760px\) \{\s*\.panels,\s*\.sections,/);
+  });
+
+  it('the loss chart is capped so its text does not scale up on wide screens (visual review)', () => {
+    expect(css).toMatch(/--chart-max-width: 800px/);
+    expect(css).toMatch(
+      /\.loss-chart \{[^}]*min-width: var\(--chart-min-width\);[^}]*max-width: var\(--chart-max-width\)/,
+    );
   });
 });

@@ -154,8 +154,8 @@ test.describe('390 px phone viewport', () => {
     }
     // The key values stay readable and labelled on the phone.
     await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
-    await expect(page.getByTestId('topbar-nav')).toContainText('22375.74 EUR');
-    await expect(page.getByTestId('topbar-nav')).toContainText('DEMO');
+    await expect(page.getByTestId('summary-nav')).toHaveText('22375.74 EUR');
+    await expect(page.getByTestId('summary-badges')).toContainText('DEMO DATA');
   });
 
   test('wide tables scroll inside their own container, not the page', async ({ page }) => {

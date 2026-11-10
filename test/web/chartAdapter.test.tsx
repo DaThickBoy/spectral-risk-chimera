@@ -3,7 +3,7 @@
 // conversion is the backend's marker position (R4.4).
 // Validates: Requirements 4.4; ui-guidelines 5
 import { describe, expect, it } from 'vitest';
-import { histogramPlot } from '../../src/web/chartAdapter.ts';
+import { allocationBars, exposureBars, histogramPlot } from '../../src/web/chartAdapter.ts';
 import type { AvailableLossDistribution } from '../../src/web/chartAdapter.ts';
 import { multiCurrencyView } from './fixtures.js';
 
@@ -39,5 +39,60 @@ describe('histogramPlot', () => {
     );
     expect(left.markerX).toBe(56);
     expect(left.markerLabelAnchor).toBe('start');
+  });
+});
+
+describe('allocationBars (S2)', () => {
+  const asset = (ticker: string, allocationPct: string | null) => ({
+    ticker,
+    allocationPct: allocationPct as never,
+  });
+
+  it('plots backend percentages on a fixed 0–100 % axis; a genuine zero is a zero-length bar', () => {
+    expect(allocationBars([asset('A', '40.2'), asset('B', '0'), asset('C', '100')])).toEqual([
+      { ticker: 'A', widthPct: 40.2, notPlotted: null },
+      { ticker: 'B', widthPct: 0, notPlotted: null },
+      { ticker: 'C', widthPct: 100, notPlotted: null },
+    ]);
+  });
+
+  it('a missing allocation is UNAVAILABLE and a value outside the axis is OUT_OF_SCALE: never drawn', () => {
+    expect(allocationBars([asset('A', null), asset('B', '-1.5'), asset('C', '100.01')])).toEqual([
+      { ticker: 'A', widthPct: null, notPlotted: 'UNAVAILABLE' },
+      { ticker: 'B', widthPct: null, notPlotted: 'OUT_OF_SCALE' },
+      { ticker: 'C', widthPct: null, notPlotted: 'OUT_OF_SCALE' },
+    ]);
+  });
+});
+
+describe('exposureBars (S3)', () => {
+  const entry = (currency: string, marketValueBase: string | null) => ({
+    currency,
+    marketValueBase: marketValueBase as never,
+  });
+  const gross = '200' as never;
+
+  it('plots each value against the fixed gross-exposure axis; zero is a zero-length bar', () => {
+    expect(exposureBars([entry('EUR', '50'), entry('USD', '0'), entry('GBP', '200')], gross)).toEqual([
+      { currency: 'EUR', widthPct: 25, negative: false, notPlotted: null },
+      { currency: 'USD', widthPct: 0, negative: false, notPlotted: null },
+      { currency: 'GBP', widthPct: 100, negative: false, notPlotted: null },
+    ]);
+  });
+
+  it('a negative value has the length of its absolute value and is flagged negative', () => {
+    expect(exposureBars([entry('USD', '-50')], gross)).toEqual([
+      { currency: 'USD', widthPct: 25, negative: true, notPlotted: null },
+    ]);
+  });
+
+  it('missing value, missing axis, and a value beyond the axis are never drawn', () => {
+    expect(exposureBars([entry('EUR', null), entry('USD', '250')], gross)).toEqual([
+      { currency: 'EUR', widthPct: null, negative: false, notPlotted: 'UNAVAILABLE' },
+      { currency: 'USD', widthPct: null, negative: false, notPlotted: 'OUT_OF_SCALE' },
+    ]);
+    expect(exposureBars([entry('EUR', '50')], null)).toEqual([
+      { currency: 'EUR', widthPct: null, negative: false, notPlotted: 'NO_AXIS' },
+    ]);
   });
 });

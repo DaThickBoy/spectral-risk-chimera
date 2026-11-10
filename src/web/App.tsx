@@ -6,14 +6,12 @@ import type { ReactElement } from 'react';
 import type { DashboardIndexResponse, DashboardViewResponse } from '../shared/apiContracts/index.js';
 import { LossDistributionSection } from './components/LossDistribution.tsx';
 import { AdjustedVarPanel, BaseVarPanel, FilingPanel, SentimentPanel } from './components/Panels.tsx';
-import {
-  CurrencyExposureSection,
-  FxSection,
-  OverviewSection,
-  PositionsSection,
-} from './components/Sections.tsx';
+import { CurrencyExposureSection, FxSection, PositionsSection } from './components/Sections.tsx';
+import { SummarySection } from './components/Summary.tsx';
 import { TopBar } from './components/TopBar.tsx';
+import type { LiveUpdateFactory, LiveUpdates } from './data/liveUpdates.js';
 import type { DashboardDataSource, LoadError, SourceInfo } from './data/source.js';
+import { LiveContext } from './live.tsx';
 
 type ViewState =
   | { readonly status: 'loading' }
@@ -48,9 +46,12 @@ export interface UrlState {
 export function App({
   source,
   url,
+  liveUpdates,
 }: {
   readonly source: DashboardDataSource;
   readonly url?: UrlState;
+  /** LIVE mode only (task 17.4): creates the stream-driven updates. Ignored for the replay. */
+  readonly liveUpdates?: LiveUpdateFactory;
 }): ReactElement {
   const [info, setInfo] = useState<SourceInfo | undefined>(undefined);
   const [index, setIndex] = useState<DashboardIndexResponse | undefined>(undefined);
@@ -121,66 +122,100 @@ export function App({
     };
   }, [source, selected, generation]);
 
+  // Task 17.4, LIVE mode only: stream-driven refreshes of the shown view. The static replay
+  // never creates live updates. A refresh replaces the view in place (no loading state); a
+  // failed one keeps the previous view and is shown in the top bar.
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const [live, setLive] = useState<LiveUpdates | undefined>(undefined);
+  const [refreshError, setRefreshError] = useState<LoadError | undefined>(undefined);
+  useEffect(() => {
+    if (source.kind !== 'LIVE' || liveUpdates === undefined) return;
+    const updates = liveUpdates({
+      selected: () => selectedRef.current,
+      refresh: async (portfolioId) => {
+        const loaded = await source.view(portfolioId);
+        if (selectedRef.current !== portfolioId) return; // the user moved on
+        if (loaded.ok) {
+          setRefreshError(undefined);
+          setView({ status: 'ready', data: loaded.value });
+        } else {
+          setRefreshError(loaded.error);
+        }
+      },
+    });
+    setLive(updates);
+    updates.start();
+    return () => {
+      updates.stop();
+      setLive(undefined);
+    };
+  }, [source, liveUpdates]);
+
   const reload = useCallback(() => setGeneration((n) => n + 1), []);
   const data = view.status === 'ready' ? view.data : undefined;
 
   return (
-    <div className="app">
-      <a className="skip-link" href="#main">
-        Skip to risk panels
-      </a>
-      <TopBar
-        source={info}
-        index={index}
-        selected={selected}
-        onSelect={setSelected}
-        onReload={reload}
-        data={data}
-      />
-      {/* tabIndex -1: the skip link moves keyboard focus here, not only the scroll position. */}
-      <main id="main" tabIndex={-1} aria-busy={view.status === 'loading'}>
-        {view.status === 'loading' ? (
-          <div className="state state-loading" role="status">
-            Loading portfolio data…
-          </div>
-        ) : null}
-        {view.status === 'error' ? (
-          <div className="state state-error" role="alert">
-            <p>
-              <strong>
-                {indexError === undefined ? 'Portfolio data unavailable' : 'Dashboard data unavailable'}
-              </strong>
-            </p>
-            <p>{ERROR_TEXT[source.kind][view.error]}</p>
-            <button type="button" onClick={reload}>
-              Try again
-            </button>
-          </div>
-        ) : null}
-        {data !== undefined ? (
-          <>
-            {data.dataMode === 'DEMO' ? (
-              <p className="demo-banner" role="note">
-                DEMO DATA: prices and history are deterministic fixtures, not market data. Results are
-                labelled DEMO_DATA and never raise alerts.
+    <LiveContext.Provider value={live}>
+      <div className="app">
+        <a className="skip-link" href="#main">
+          Skip to risk panels
+        </a>
+        <TopBar
+          source={info}
+          index={index}
+          selected={selected}
+          onSelect={setSelected}
+          onReload={reload}
+          data={data}
+          refreshError={refreshError}
+        />
+        {/* tabIndex -1: the skip link moves keyboard focus here, not only the scroll position. */}
+        <main id="main" tabIndex={-1} aria-busy={view.status === 'loading'}>
+          {view.status === 'loading' ? (
+            <div className="state state-loading" role="status">
+              Loading portfolio data…
+            </div>
+          ) : null}
+          {view.status === 'error' ? (
+            <div className="state state-error" role="alert">
+              <p>
+                <strong>
+                  {indexError === undefined ? 'Portfolio data unavailable' : 'Dashboard data unavailable'}
+                </strong>
               </p>
-            ) : null}
-            <div className="panels">
-              <BaseVarPanel data={data} />
-              <AdjustedVarPanel data={data} />
-              <SentimentPanel data={data} />
-              <FilingPanel data={data} />
+              <p>{ERROR_TEXT[source.kind][view.error]}</p>
+              <button type="button" onClick={reload}>
+                Try again
+              </button>
             </div>
-            <div className="sections">
-              <OverviewSection data={data} />
+          ) : null}
+          {data !== undefined ? (
+            <>
+              <SummarySection data={data} />
+              {data.dataMode === 'DEMO' ? (
+                <p className="demo-banner" role="note">
+                  DEMO DATA: prices and history are deterministic fixtures, not market data. Results are
+                  labelled DEMO_DATA and never raise alerts.
+                </p>
+              ) : null}
+              <div className="panels">
+                <BaseVarPanel data={data} />
+                <AdjustedVarPanel data={data} />
+                <SentimentPanel data={data} />
+                <FilingPanel data={data} />
+              </div>
+              {/* S5 order (ui-guidelines §3): positions, then charts, then supporting detail.
+                  Currency exposure is followed by the FX rates behind it. */}
+              <PositionsSection data={data} />
+              <LossDistributionSection data={data} />
+              {/* Full width: at half width the exact FX rates wrap into unreadable columns. */}
               <CurrencyExposureSection data={data} />
-            </div>
-            <PositionsSection data={data} />
-            <LossDistributionSection data={data} />
-            <FxSection data={data} />
-          </>
-        ) : null}
-      </main>
-    </div>
+              <FxSection data={data} />
+            </>
+          ) : null}
+        </main>
+      </div>
+    </LiveContext.Provider>
   );
 }

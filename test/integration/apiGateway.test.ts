@@ -74,7 +74,22 @@ describe('AT-SEC-27: unknown fields and invalid input are rejected (Zod is the a
     const error = errorOf(response.payload);
     expect(error.code).toBe('VALIDATION_FAILED');
     expect(error.message).toBe('The request is invalid.');
-    expect(response.payload).not.toMatch(/extra|other|ABC|12\.5|1e5|__proto__|constructor/);
+    // The correlation ID is a server-generated random UUID: it can never carry request input,
+    // but its hex digits can coincidentally contain "1e5". Check its shape, then scan the rest
+    // of the body (everything that could echo the input) for the request's text.
+    expect(error.correlationId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    const withoutId = response.payload.split(error.correlationId).join('');
+    expect(withoutId).not.toMatch(/extra|other|ABC|12\.5|1e5|__proto__|constructor/);
+  });
+
+  it('the no-echo check ignores a correlation ID that happens to contain "1e5" (flake regression)', () => {
+    const payload =
+      '{"error":{"code":"VALIDATION_FAILED","message":"The request is invalid.","correlationId":"a3b363dd-dc49-41e5-8adf-9b50639133fa"}}';
+    const error = errorOf(payload);
+    expect(payload).toMatch(/1e5/); // the old whole-payload check would have failed here
+    expect(payload.split(error.correlationId).join('')).not.toMatch(
+      /extra|other|ABC|12\.5|1e5|__proto__|constructor/,
+    );
   });
 
   it('a route without a body schema for POST cannot be defined', () => {

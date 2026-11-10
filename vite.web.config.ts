@@ -22,7 +22,16 @@ export default defineConfig({
   },
   server: {
     host: '127.0.0.1',
-    ...(backend === undefined ? {} : { proxy: { '/dashboard': { target: backend, changeOrigin: true } } }),
+    // `/stream` (task 17.4): the read-only WebSocket. The browser's Origin is forwarded unchanged,
+    // so start the backend with `--allowed-origin` set to this dev server's origin.
+    ...(backend === undefined
+      ? {}
+      : {
+          proxy: {
+            '/dashboard': { target: backend, changeOrigin: true },
+            '/stream': { target: backend, changeOrigin: true, ws: true },
+          },
+        }),
   },
   preview: { host: '127.0.0.1' },
 });
