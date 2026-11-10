@@ -18,13 +18,16 @@ const DEMO_FILE = repoPath('config', 'demo', 'kiroween-2026.demo.jsonc');
 const TEMPLATE = repoPath('config', 'config.template.jsonc');
 const valid = (config: unknown): boolean => ValidatedConfigSchema.safeParse(config).success;
 /** DR-KW-1 H3: approved for the hackathon demo only. */
-const DEMO_APPROVED_KEYS = [
+const H3_KEYS = [
   'fx.maxRateAgeSeconds',
   'marketData.maxStalenessDays',
   'marketData.maxReturnGapDays',
   'recalc.minValueChangePct',
   'import.oversellPolicy',
 ];
+/** DR-KW-1 H9 (Kiroween A1): approved for the hackathon demo only, for display-only DEMO sentiment. */
+const H9_KEYS = ['sentiment.maxAgeSeconds', 'sentiment.windowSeconds', 'sentiment.maxFutureSkewSeconds'];
+const DEMO_APPROVED_KEYS = [...H3_KEYS, ...H9_KEYS];
 
 function load(content: unknown) {
   const temp = tempDir('demo-config');
@@ -58,14 +61,22 @@ describe('the committed demo configuration (H3)', () => {
     });
   });
 
-  it('carries exactly the five approved demo values (DR-KW-1 H3), all listed as provisional', () => {
+  it('carries exactly the five H3 and three H9 approved demo values, all listed as provisional', () => {
     expect(result.values['fx']).toMatchObject({ maxRateAgeSeconds: 345_600 });
     expect(result.values['marketData']).toEqual({ maxStalenessDays: 5, maxReturnGapDays: 5 });
     expect(result.values['recalc']).toEqual({ minValueChangePct: '0.10' });
     expect(result.values['import']).toMatchObject({ oversellPolicy: 'REJECT' });
+    // H9: the approved demo sentiment settings (plus the loader's documented operational reconnect
+    // defaults); no REST polling setting, so no sentiment provider is ever polled.
+    expect(result.values['sentiment']).toMatchObject({
+      maxAgeSeconds: 900,
+      windowSeconds: 300,
+      maxFutureSkewSeconds: 5,
+    });
+    expect(result.values['sentiment']).not.toHaveProperty('rest');
     expect(result.features.baseVaR).toMatchObject({ available: true, missingKeys: [] });
     expect(result.features.import.available).toBe(true);
-    // Only the approved baselines, the explicit H2/H6 decisions, and the five demo values are filled in.
+    // Only the approved baselines, the explicit H2/H6 decisions, and the eight demo values are filled in.
     const filled = FINANCIAL_KEYS.filter((key) => result.keys[key].status === 'VALID');
     expect(filled.sort()).toEqual(
       [
@@ -84,16 +95,14 @@ describe('the committed demo configuration (H3)', () => {
     );
   });
 
-  it('leaves every other unapproved value empty (no alert thresholds, sentiment, filing, or time zone)', () => {
+  it('leaves every other unapproved value empty (no alert thresholds, filing, or time zone)', () => {
     expect(result.missingFinancialKeys).toEqual(
-      expect.arrayContaining([
-        'sentiment.maxAgeSeconds',
-        'alerts.var.thresholdPct',
-        'filing.maxAgeDays',
-        'import.defaultTimezone',
-      ]),
+      expect.arrayContaining(['alerts.var.thresholdPct', 'filing.maxAgeDays', 'import.defaultTimezone']),
     );
-    expect(result.features.adjustedVaR.available).toBe(false);
+    expect(result.missingFinancialKeys).not.toEqual(expect.arrayContaining(H9_KEYS));
+    // H9: the adjustment settings are complete, so eligibility decides. DEMO sentiment is never
+    // eligible (R15), so Adjusted VaR stays unavailable at run time (H7). Alerts stay disabled.
+    expect(result.features.adjustedVaR).toMatchObject({ available: true, missingKeys: [] });
     expect(result.features.varAlerts.available).toBe(false);
   });
 
@@ -105,6 +114,9 @@ describe('the committed demo configuration (H3)', () => {
       'maxReturnGapDays',
       'minValueChangePct',
       'oversellPolicy',
+      'maxAgeSeconds',
+      'windowSeconds',
+      'maxFutureSkewSeconds',
     ]) {
       expect(template).toMatch(new RegExp(`"${key}": null`));
     }

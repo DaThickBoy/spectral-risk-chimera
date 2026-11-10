@@ -22,6 +22,11 @@
   --color-high: #ff7a45;
   --color-critical: #ff4d6d;
   --color-critical-bg: #2a1218;
+  /* Charts (neutral data marks; the accent stays reserved for interaction) */
+  --chart-bar: var(--color-text-secondary);
+  --chart-axis: var(--color-text-muted);
+  --chart-marker: var(--color-text);
+  --chart-min-width: 600px;
   /* Type */
   --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-num: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, monospace;
@@ -125,6 +130,7 @@ select:hover {
 
 .brand-name {
   margin: 0;
+  font-size: var(--size-body);
   font-weight: 600;
 }
 
@@ -136,6 +142,7 @@ select:hover {
 
 .topbar-controls {
   display: flex;
+  flex-wrap: wrap; /* on narrow screens the select and Reload move to their own line, never past the bar */
   align-items: center;
   gap: var(--space-2);
 }
@@ -416,6 +423,81 @@ td.num {
 .attribution ul {
   margin: var(--space-1) 0 0;
   padding-left: var(--space-4);
+}
+
+/* Loss distribution chart (A2). The SVG keeps a minimum width so its text never drops below the
+   minimum size; on narrow screens it scrolls inside its own focusable region. */
+.chart-wrap {
+  overflow-x: auto;
+  margin-top: var(--space-2);
+}
+
+.loss-chart {
+  display: block;
+  width: 100%;
+  min-width: var(--chart-min-width);
+  height: auto;
+}
+
+.chart-axis {
+  stroke: var(--chart-axis);
+  stroke-width: 1;
+}
+
+.chart-bar {
+  fill: var(--chart-bar);
+}
+
+.chart-marker {
+  stroke: var(--chart-marker);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.chart-tick,
+.chart-axis-label,
+.chart-marker-label {
+  fill: var(--color-text-secondary);
+  font-family: var(--font-num);
+  font-size: var(--size-small);
+}
+
+.chart-axis-label {
+  font-family: var(--font-ui);
+}
+
+.chart-marker-label {
+  fill: var(--color-text);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--size-small);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+}
+
+.legend-bar {
+  background: var(--chart-bar);
+}
+
+.legend-marker {
+  height: 0;
+  border-top: 2px dashed var(--chart-marker);
 }
 
 /* Responsive layout */

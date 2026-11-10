@@ -24,6 +24,12 @@ export type {
 } from './demoPortfolios.js';
 export type { DemoFixtures } from './demoFixtures.js';
 export {
+  DEMO_SENTIMENT_OBSERVED_AT,
+  DEMO_SENTIMENT_PROVIDER,
+  DEMO_SENTIMENT_VALUES,
+  DemoSentimentFixture,
+} from './demoSentiment.js';
+export {
   parseStartArguments,
   PROVISIONAL_OPERATIONAL_VALUES,
   startApplication,

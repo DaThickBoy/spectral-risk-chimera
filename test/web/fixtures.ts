@@ -15,6 +15,15 @@ const NOTES = [
 export const OD1_TEXT =
   'No sentiment aggregation method is approved (open decision OD-1), so no sentiment index can be current and Adjusted VaR is not calculated.';
 
+const bucket = (lower: string, upper: string, count: number, lowerDisplay: string, upperDisplay: string) => ({
+  lower,
+  upper,
+  upperInclusive: false,
+  count,
+  lowerDisplay,
+  upperDisplay,
+});
+
 const ecbRate = (currency: string, rate: string) => ({
   pair: `${currency}EUR`,
   rate,
@@ -97,7 +106,7 @@ const explanation = `${OD1_TEXT} Unavailable: adjustment settings are missing (s
 /** The seeded multi-currency portfolio with current ECB-derived rates. */
 export function multiCurrencyView(): DashboardViewResponse {
   return DashboardViewResponseSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     portfolioId: 'demo-eur-usd-gbp',
     generatedAt: '2026-11-06T16:00:01.000Z',
     runMode: 'DEMO_FIXTURES',
@@ -186,6 +195,37 @@ export function multiCurrencyView(): DashboardViewResponse {
       explanation:
         'SEC filing risk is not configured in this demonstration (Kiroween decision H8); no filing score exists.',
     },
+    // The A2 known-answer case (losses -2..7, K = 4), small enough to read in component tests.
+    lossDistribution: {
+      status: 'AVAILABLE',
+      metric: 'BASE_VAR_SCENARIO_LOSSES',
+      currency: 'EUR',
+      confidence: '0.95',
+      horizonDays: 1,
+      quantileMethod: 'HYNDMAN_FAN_TYPE_7',
+      calculatedAt: '2026-11-06T16:00:00.000Z',
+      scenarioWindow: { firstDate: '2026-10-23', lastDate: '2026-11-06' },
+      scenarioCount: 10,
+      bucketCount: 4,
+      width: '2.25',
+      widthDisplay: '2.25',
+      min: '-2',
+      max: '7',
+      buckets: [
+        bucket('-2', '0.25', 3, '-2.00', '0.25'),
+        bucket('0.25', '2.5', 2, '0.25', '2.50'),
+        bucket('2.5', '4.75', 2, '2.50', '4.75'),
+        { ...bucket('4.75', '7', 3, '4.75', '7.00'), upperInclusive: true },
+      ],
+      varMarker: {
+        rawQuantile: '6.55',
+        rawQuantileDisplay: '6.55',
+        confidence: '0.95',
+        bucketIndex: 3,
+        scenariosAbove: 1,
+        position: '3.8',
+      },
+    },
     display: {
       currency: 'EUR',
       minorUnits: 2,
@@ -253,6 +293,11 @@ export function fxProblemView(): DashboardViewResponse {
       ],
       calculation: { ...base.view.calculation, status: 'FX_UNAVAILABLE' },
     },
+    lossDistribution: {
+      status: 'UNAVAILABLE',
+      reason: 'BASE_VAR_UNAVAILABLE',
+      explanation: 'Base VaR is unavailable (FX_UNAVAILABLE), so no scenario loss distribution is shown.',
+    },
     fx: [
       base.fx[0],
       {
@@ -305,7 +350,7 @@ export function fxProblemView(): DashboardViewResponse {
 
 export function demoIndex(): DashboardIndexResponse {
   return DashboardIndexResponseSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: '2026-11-06T16:00:01.000Z',
     runMode: 'DEMO_FIXTURES',
     portfolios: [

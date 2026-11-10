@@ -189,7 +189,7 @@ describe('H3/H5: the demo configuration never starts outside the demo mode', () 
     });
   });
 
-  it('the committed demo configuration starts in demo mode and reports its five approved demo values', async () => {
+  it('the committed demo configuration starts in demo mode and reports its eight approved demo values (H3, H9)', async () => {
     const s = await startCommitted(FRIDAY_AFTER_PUBLICATION);
     expect(s.log().find((r) => r['msg'] === 'start.demo_config')).toMatchObject({
       provisionalKeys: [
@@ -198,6 +198,9 @@ describe('H3/H5: the demo configuration never starts outside the demo mode', () 
         { key: 'marketData.maxReturnGapDays', status: 'VALID' },
         { key: 'recalc.minValueChangePct', status: 'VALID' },
         { key: 'import.oversellPolicy', status: 'VALID' },
+        { key: 'sentiment.maxAgeSeconds', status: 'VALID' },
+        { key: 'sentiment.windowSeconds', status: 'VALID' },
+        { key: 'sentiment.maxFutureSkewSeconds', status: 'VALID' },
       ],
     });
     expect(
@@ -439,8 +442,9 @@ describe('committed demo configuration (DR-KW-1 H3 values): valuation, Base VaR,
         lookbackReturns: 250,
         completeness: 'COMPLETE',
         baseVaR: { validity: 'CURRENT' },
-        // Demo sentiment settings are empty: Adjusted VaR is unavailable, never a copy of Base VaR.
-        adjustedVaR: { validity: 'UNAVAILABLE', value: null, status: 'ADJUSTMENT_CONFIG_MISSING' },
+        // H9: the settings are complete and every position's sentiment is the DEMO fixture, which
+        // is never eligible. Adjusted VaR is unavailable, never a copy of Base VaR (H7).
+        adjustedVaR: { validity: 'UNAVAILABLE', value: null, status: 'SENTIMENT_NOT_CURRENT' },
       });
       expect(risk['flags']).toContain('DEMO_DATA');
     }

@@ -29,8 +29,14 @@
 // Still empty, not approved: import.defaultTimezone (the seeded rows carry explicit
 // UTC timestamps, so it is not needed), the alert thresholds (demo results never
 // alert anyway, R30.11), and filing.maxAgeDays (no SEC in the demo, H8).
-// Adjusted VaR stays unavailable by design (H7: no approved aggregation method,
-// OD-1), so the sentiment settings below are left null as well.
+// Demo values approved for the hackathon demo ONLY (DR-KW-1, H9, Kiroween A1,
+// 2026-11-10), also listed in demo.provisionalKeys, for the display-only DEMO
+// sentiment fixture (provider demo-sentiment-fixture, sourceKind DEMO):
+// - sentiment.maxAgeSeconds       900
+// - sentiment.windowSeconds       300
+// - sentiment.maxFutureSkewSeconds 5
+// They resolve neither OD-6 nor OD-1. Adjusted VaR stays unavailable by design (H7:
+// no approved aggregation method, and DEMO sentiment is never eligible).
 //
 // This file keeps its reviewed layout (.prettierignore), like the template.
 // =============================================================================
@@ -42,7 +48,10 @@
       "marketData.maxStalenessDays",
       "marketData.maxReturnGapDays",
       "recalc.minValueChangePct",
-      "import.oversellPolicy"
+      "import.oversellPolicy",
+      "sentiment.maxAgeSeconds",
+      "sentiment.windowSeconds",
+      "sentiment.maxFutureSkewSeconds"
     ]
   },
 
@@ -58,11 +67,13 @@
     "multiplier": "1.15"
   },
 
-  // Unresolved (OD-6, OD-1). Adjusted VaR is unavailable in the demo either way (H7).
+  // DR-KW-1 H9 (Kiroween A1, 2026-11-10): approved for the hackathon demo only, so the DEMO
+  // sentiment fixture can be displayed. OD-6 and OD-1 stay open; no aggregator exists, and DEMO
+  // sentiment is never eligible, so Adjusted VaR stays unavailable (H7).
   "sentiment": {
-    "maxAgeSeconds": null,
-    "windowSeconds": null,
-    "maxFutureSkewSeconds": null
+    "maxAgeSeconds": 900,
+    "windowSeconds": 300,
+    "maxFutureSkewSeconds": 5
   },
 
   // Unresolved (OD-6).

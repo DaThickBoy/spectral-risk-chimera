@@ -48,6 +48,69 @@ describe('Pages workflow', () => {
     expect(build).toMatch(/with:\n {10}path: dist\/web\n/);
   });
 
+  describe('M1: the bundle secret scan gates the upload and the deployment', () => {
+    const build = section(pages, '  build:', '  deploy:');
+    const ciScanJob = section(ci, '  secret-scan:', '  dependency-audit:');
+    const SCAN =
+      '"${RUNNER_TEMP}/gitleaks" dir dist/web --config .gitleaks-bundle.toml --redact --no-banner --exit-code 1';
+    /** The `run: |` body of the step with this name (up to the next step). */
+    const runOf = (text: string, name: string): string =>
+      section(text, `- name: ${name}`).split(/\r?\n {6}(?:- name:|#)/)[0] ?? '';
+
+    it('uses the same pinned, checksum-verified gitleaks as the CI secret-scan job', () => {
+      for (const line of [
+        'GITLEAKS_VERSION: 8.30.1',
+        'GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb',
+      ]) {
+        expect(build, line).toContain(line);
+        expect(ciScanJob, line).toContain(line);
+      }
+      // The install step is the identical script in both workflows (no unpinned or unverified binary).
+      const pagesInstall = runOf(build, 'Install pinned gitleaks');
+      const ciInstall = runOf(ciScanJob, 'Install pinned gitleaks');
+      expect(pagesInstall.length).toBeGreaterThan(0);
+      expect(pagesInstall.trim()).toBe(ciInstall.trim());
+      expect(pagesInstall).toContain('sha256sum --check --strict');
+      expect(pagesInstall).toContain('releases/download/v${GITLEAKS_VERSION}/');
+    });
+
+    it('scans dist/web after every step that writes it and immediately before configure and upload', () => {
+      const order = [
+        'run: npm run build',
+        'run: npm run export:replay',
+        'run: npm run test:e2e',
+        '- name: Install pinned gitleaks',
+        'test -s dist/web/index.html',
+        'test -s dist/web/replay/manifest.json',
+        SCAN,
+        'uses: actions/configure-pages@',
+        'uses: actions/upload-pages-artifact@',
+      ];
+      let last = -1;
+      for (const step of order) {
+        const index = build.indexOf(step);
+        expect(index, step).toBeGreaterThan(last);
+        last = index;
+      }
+      // Nothing between the scan and the upload can change the uploaded directory.
+      const afterScan = build.slice(
+        build.indexOf(SCAN),
+        build.indexOf('uses: actions/upload-pages-artifact@'),
+      );
+      expect(afterScan).not.toMatch(/run:/);
+    });
+
+    it('a failing scan stops the job: no bypass, and the deploy job needs this build job', () => {
+      // Without continue-on-error or an always()/failure() condition, a failed step skips every
+      // later step (so the upload never runs) and fails the job, which blocks `needs: build`.
+      expect(build).not.toMatch(/continue-on-error|if:|\|\| true|always\(\)|failure\(\)/);
+      expect(runOf(build, 'Scan the Pages bundle (dist/web) for secrets')).toContain('set -euo pipefail');
+      const deploy = section(pages, '  deploy:');
+      expect(deploy).toMatch(/needs: build/);
+      expect(deploy).not.toMatch(/always\(\)|failure\(\)|continue-on-error/);
+    });
+  });
+
   it('only the deploy job can write to Pages, from main, through the github-pages environment', () => {
     const deploy = section(pages, '  deploy:');
     expect(deploy).toMatch(/needs: build/);

@@ -141,6 +141,14 @@ describe('eligibility gate (14.1)', () => {
   it.each<[string, SentimentForRisk, string]>([
     ['stale (AT-SEN-08)', { ...current('AAA', '-0.9'), status: 'STALE' }, 'STALE'],
     ['demo (AT-SEN-09)', { ...current('AAA', '-0.9'), sourceKind: 'DEMO' }, 'DEMO'],
+    // H9: the DEMO-UK fixture value, below the -0.60 threshold, even if it reached the engine.
+    ['demo fixture -0.72 (H9)', { ...current('AAA', '-0.72'), sourceKind: 'DEMO' }, 'DEMO'],
+    // H9: what the sentiment state actually passes for DEMO-only data (value withheld).
+    [
+      'demo, value withheld by the state (H9)',
+      { ticker: 'AAA', value: null, status: 'CURRENT', sourceKind: 'DEMO', source: 'demo-sentiment-fixture' },
+      'DEMO',
+    ],
     [
       'unavailable (AT-SEN-11)',
       { ticker: 'AAA', value: null, status: 'UNAVAILABLE', sourceKind: 'REAL', source: 'test-sentiment' },

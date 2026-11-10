@@ -4,7 +4,7 @@ A portfolio risk-monitoring application that stitches together pieces that rarel
 
 > **Status: hackathon demonstration, not a production system.** All market data in the demo is deterministic DEMO fixture data. Production startup is deliberately blocked. Nothing here is investment advice, and the application never trades.
 
-- Planned public demo (static replay): `https://dathickboy.github.io/spectral-risk-chimera/`. **Not deployed or verified yet.** See [Submission checklist](docs/submission-checklist.md).
+- Public demo (static recorded replay, DEMO data): [https://dathickboy.github.io/spectral-risk-chimera/](https://dathickboy.github.io/spectral-risk-chimera/). Deployed by the "Pages (static DEMO replay)" workflow from `main` after pull request #2 was merged (2026-11-09). Verified on 2026-11-09: the page loads, and the published `replay/manifest.json` has the same SHA-256 as a local `npm run export:replay`. See [Submission checklist](docs/submission-checklist.md).
 - Kiro usage write-up: [docs/kiro-usage.md](docs/kiro-usage.md)
 - Demo video script: [docs/demo-script.md](docs/demo-script.md)
 
@@ -48,6 +48,8 @@ The dashboard shows four separate panels and never merges them: **Base VaR**, **
 
 - Base VaR is calculated and shown with its parameters and as-of date. It is a percentile-based loss estimate, not a maximum drawdown or a worst case.
 - Adjusted VaR shows **Unavailable** and explains why: no sentiment aggregation method is approved (OD-1). The Base figure is never copied into the Adjusted panel.
+- Market Sentiment shows four invented **DEMO** observations (decision H9), each labelled `CURRENT` and `DEMO`, as the latest observation, not an aggregated index, with its observation time. DEMO sentiment is never eligible for the adjustment and never raises an alert. Even DEMO-UK at -0.72, below the -0.60 threshold, triggers nothing, so Adjusted VaR stays Unavailable (`SENTIMENT_NOT_CURRENT`).
+- Below the positions, a **loss distribution** shows the 250 Base VaR scenario losses in 20 equal-width buckets, with the VaR marker at the raw 95% quantile and a table of every bucket's exact edges and counts. It displays the existing Base VaR scenarios only; it is not a separate risk method.
 
 ## Quick start (local demo)
 
@@ -124,7 +126,7 @@ Two exports from the same inputs produce byte-identical files. The manifest (`di
 | `npm run export:replay` | Records the static replay                                                                                                                                      |
 | `npm run test:e2e`      | Playwright (Chromium) against the built replay under the Pages subpath. Run `npx playwright install chromium` once, and run `build` and `export:replay` first. |
 
-CI (`.github/workflows/ci.yml`) runs these on Node.js 24.22.1 and 26, together with a pinned secret scan, `npm audit --audit-level=high`, and the browser tests. `npm audit` reports existing moderate, development-only findings; see [SECURITY.md](SECURITY.md).
+CI (`.github/workflows/ci.yml`) runs these on Node.js 24.22.1 and 26, together with a pinned secret scan (gitleaks over the repository and, with `.gitleaks-bundle.toml`, over the built `dist/web` bundle that GitHub Pages publishes), `npm audit --audit-level=high`, and the browser tests. `npm audit` reports existing moderate, development-only findings; see [SECURITY.md](SECURITY.md).
 
 ## Architecture
 
@@ -173,7 +175,7 @@ test/           unit, property, integration, web, e2e, fixtures (recorded ECB re
 - **Production mode.** Undefined (OD-19); production startup is blocked.
 - **No authentication** (OD-7). The backend binds to loopback only and must not be exposed publicly. The public demo is a static replay with no backend.
 - **Cross-origin reads of the local backend.** The request guard blocks cross-site writes, but it does not require an `Origin` on `GET`. While the local backend runs, a web page open in the same browser can still send `GET` requests to it. It cannot read the responses, and no `GET` changes a portfolio, the ledger, or an alert. However, the valuation reads (positions, allocation, dashboard view) can trigger outbound FX provider requests, record FX observations, and use up the shared rate limit. Removing these side effects from reads is planned as separate hardening work.
-- **Demo configuration values** (freshness and staleness thresholds, oversell policy) are approved for the hackathon only, not for real use (OD-6).
+- **Demo configuration values** (freshness and staleness thresholds, oversell policy, and the sentiment maximum age, window, and future-skew tolerance) are approved for the hackathon only, not for real use (OD-6; H3 and H9).
 
 ## Security
 

@@ -15,9 +15,19 @@ import { z } from 'zod';
 import { Iso4217Code, IsoDate } from '../schemas.js';
 import { IsoUtcMillis } from '../timestamps.js';
 import { CanonicalDecimalSchema, PortfolioIdSchema, PositionItemSchema } from './portfolio.js';
+import { LossDistributionSchema } from './lossDistribution.js';
 import { PortfolioRiskViewSchema } from './views.js';
 
-export const DASHBOARD_SCHEMA_VERSION = 1;
+/**
+ * Version of the dashboard contract family: the view, the index, and the replay manifest.
+ * Every schema here is strict (unknown fields are rejected) and requires `schemaVersion` to equal
+ * this literal, so any change to the required shape is incompatible in both directions. Such a
+ * change increments the version; the reader then refuses responses and replays of another
+ * version (`INVALID_RESPONSE`) instead of misreading them.
+ * - 1: tasks 17.1 to 17.3 and the OD-21 replay.
+ * - 2 (Kiroween A2, 2026-11-10): the view adds the required `lossDistribution`.
+ */
+export const DASHBOARD_SCHEMA_VERSION = 2;
 
 const NullableDisplay = z.string().min(1).nullable();
 const Code = z.string().regex(/^[A-Z][A-Z0-9_]*$/);
@@ -63,6 +73,8 @@ export const DashboardViewResponseSchema = z.strictObject({
   }),
   /** SEC filing risk is not configured (H8); no filing score exists. */
   filing: z.strictObject({ status: z.literal('NOT_CONFIGURED'), explanation: z.string().min(1) }),
+  /** Kiroween A2: histogram of the Base VaR scenario losses, or why it is unavailable. */
+  lossDistribution: LossDistributionSchema,
   /** FR-14 display text (ROUND_HALF_UP to the base currency's minor units), computed by the backend. */
   display: z.strictObject({
     currency: Iso4217Code,

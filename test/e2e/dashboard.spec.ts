@@ -48,6 +48,7 @@ interface RecordedView {
   fx: Record<string, unknown>[];
   view: { baseVaR: unknown };
   display: { baseVaR: string | null };
+  lossDistribution: unknown;
   freshness: Record<string, unknown>;
 }
 
@@ -82,6 +83,12 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     await expect(panel(page, 'Base VaR')).toContainText(
       '1 day · 95% · Historical Simulation · as of 2026-11-06',
     );
+    // Every risk panel header states its time (ui-guidelines 3); NAV and overview carry DEMO.
+    await expect(panel(page, 'Sentiment-Adjusted VaR')).toContainText('1 day · 95% · as of 2026-11-06');
+    await expect(panel(page, 'Market Sentiment')).toContainText('as of 2026-11-06 16:00 UTC');
+    await expect(panel(page, 'SEC Filing Risk')).toContainText('as of \u2014 (not configured)');
+    await expect(page.getByTestId('topbar-nav')).toContainText('DEMO');
+    await expect(page.getByTestId('overview-badges')).toContainText('DEMO');
 
     const adjusted = panel(page, 'Sentiment-Adjusted VaR');
     await expect(adjusted.getByTestId('adjusted-var-value')).toHaveText('Unavailable');
@@ -116,6 +123,83 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
 
     expectStaticOnly(w, new URL(baseURL ?? '').origin);
     expectClean(w);
+  });
+
+  test('A2: the loss distribution shows 20 buckets of the recorded Base VaR scenarios and the VaR marker', async ({
+    page,
+  }) => {
+    for (const [portfolio, varText, raw] of [
+      ['demo-eur-usd-gbp', '124.10', '124.095376636618777169053781414066570861'],
+      ['demo-eur-only', '140.18', '140.1806869978253353800812193977189520388'],
+    ] as const) {
+      await page.goto(`${BASE}?portfolio=${portfolio}`);
+      const loss = page.getByTestId('loss-distribution');
+      await expect(loss.getByRole('heading', { level: 2 })).toHaveText(
+        'Loss distribution · Base VaR scenarios · 1 day · 95% · Historical Simulation · as of 2026-11-06 16:00 UTC',
+      );
+      await expect(page.getByTestId('loss-badges')).toContainText('DEMO');
+      await expect(
+        page.getByRole('img', { name: 'Base VaR scenario losses, 20 buckets, EUR' }),
+      ).toBeVisible();
+      await expect(page.locator('[data-testid^="loss-bar-"]')).toHaveCount(20);
+      await expect(loss.locator('svg')).toContainText(`VaR 95% · ${varText} EUR`);
+      const rows = page.getByTestId('loss-table').locator('tbody tr');
+      await expect(rows).toHaveCount(20);
+      // The marker bucket names the exact, unrounded raw quantile (the Base VaR panel shows it too).
+      await expect(rows.nth(19)).toContainText(`VaR 95% at ${raw}`);
+      await expect(panel(page, 'Base VaR')).toContainText(raw);
+      await expect(page.getByTestId('loss-summary')).toContainText(
+        '250 daily scenarios from returns ending 2025-11-24 to 2026-11-06 (UTC dates), in 20 buckets',
+      );
+      await expect(page.getByTestId('loss-summary')).toContainText(
+        'Scenarios with a larger loss than the marker: 13.',
+      );
+    }
+  });
+
+  test('A1: DEMO sentiment is shown exactly, CURRENT and DEMO, as the latest observation; Adjusted VaR stays unavailable', async ({
+    page,
+  }) => {
+    for (const [portfolio, rows] of [
+      [
+        'demo-eur-usd-gbp',
+        [
+          ['DEMO-EU', '-0.35'],
+          ['DEMO-UK', '-0.72'],
+          ['DEMO-US', '0.42'],
+        ],
+      ],
+      [
+        'demo-eur-only',
+        [
+          ['DEMO-A', '0.15'],
+          ['DEMO-EU', '-0.35'],
+        ],
+      ],
+    ] as const) {
+      await page.goto(`${BASE}?portfolio=${portfolio}`);
+      const sentiment = panel(page, 'Market Sentiment');
+      await expect(sentiment).toContainText('-1 (bearish) to +1 (bullish)');
+      await expect(sentiment).toContainText('Scale: -1 bearish to +1 bullish');
+      await expect(sentiment).not.toContainText(/confidence/i);
+      for (const [ticker, value] of rows) {
+        const row = page.getByTestId(`sentiment-${ticker}`);
+        await expect(row).toContainText(`${ticker} ${value}`);
+        await expect(row).toContainText('CURRENT');
+        await expect(row).toContainText('DEMO');
+        await expect(row).toContainText(
+          'latest observation, not an aggregated index · observed 2026-11-06 15:55 UTC',
+        );
+      }
+      const adjusted = panel(page, 'Sentiment-Adjusted VaR');
+      await expect(page.getByTestId('adjusted-var-value')).toHaveText('Unavailable');
+      await expect(adjusted).toContainText('SENTIMENT NOT CURRENT');
+      await expect(adjusted).toContainText('AGGREGATION NOT APPROVED · OD-1');
+      await expect(page.getByTestId('adjusted-var-reason')).toContainText(
+        'No sentiment aggregation method is approved (open decision OD-1)',
+      );
+      await expect(page.getByTestId('adjusted-var-reason')).toContainText('(DEMO)');
+    }
   });
 
   test('the EUR-only fallback, back and forward, and refresh keep the portfolio in the URL', async ({
@@ -209,6 +293,12 @@ test.describe('states', () => {
       lastValid: null,
     };
     variant.display.baseVaR = null;
+    // As the backend reports it when Base VaR is unavailable (A2): a reason, never zero bars.
+    variant.lossDistribution = {
+      status: 'UNAVAILABLE',
+      reason: 'BASE_VAR_UNAVAILABLE',
+      explanation: 'Base VaR is unavailable (FX_UNAVAILABLE), so no scenario loss distribution is shown.',
+    };
     variant.freshness = {
       ...variant.freshness,
       fxStatuses: ['IDENTITY', 'STALE', 'UNAVAILABLE'],
@@ -224,6 +314,10 @@ test.describe('states', () => {
     const fx = page.locator('section', { has: page.getByRole('heading', { name: 'FX rates used' }) });
     await expect(fx).toContainText('STALE');
     await expect(fx).toContainText('PROVIDER ERROR');
+    const loss = page.getByTestId('loss-distribution');
+    await expect(loss).toContainText('Unavailable (BASE VAR UNAVAILABLE)');
+    await expect(loss.locator('svg')).toHaveCount(0);
+    await expect(loss.locator('table')).toHaveCount(0);
   });
 
   test('loading state while the replay manifest is delayed', async ({ page }) => {

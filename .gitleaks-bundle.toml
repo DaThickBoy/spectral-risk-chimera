@@ -1,0 +1,9 @@
+# gitleaks configuration for the BUILT, published dashboard (dist/web/; Kiroween decision A3;
+# R24.1, R24.5). Uses the default rule set.
+#
+# This file deliberately has no path allowlist. `.gitleaks.toml` excludes `dist/` because the
+# source scan treats build output as generated, so reusing it here would silently skip every
+# file of the bundle that GitHub Pages publishes. Every file under dist/web/ (HTML, JS, CSS,
+# source maps if any, and the recorded replay JSON) is scanned.
+[extend]
+useDefault = true

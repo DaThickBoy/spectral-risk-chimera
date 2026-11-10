@@ -71,6 +71,16 @@ describe('AT-ARC-02: web/ boundary', () => {
   it('web/ must not import domain modules', () => {
     expect(has('web-not-to-domain', 'src/web/index.ts', 'src/risk/index.ts')).toBe(true);
   });
+
+  it('A2: only the chart adapter may import the Decimal helper, and nothing else beyond the contracts', () => {
+    expect(has('web-not-to-domain', 'src/web/usesDecimal.ts', 'src/shared/decimal.ts')).toBe(true);
+    expect(has('web-chart-adapter-boundary', 'src/web/chartAdapter.ts', 'src/risk/index.ts')).toBe(true);
+    expect(
+      seeded.violations.filter(
+        (v) => v.from === 'src/web/chartAdapter.ts' && v.to === 'src/shared/decimal.ts',
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe('real tree', () => {

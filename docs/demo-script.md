@@ -1,6 +1,6 @@
 # Demo video script (target 2:45, hard limit under 3:00)
 
-This is the script for the Kiroween 2026 YouTube demo. It shows the recorded replay, either on the GitHub Pages site once it is live or served locally:
+This is the script for the Kiroween 2026 YouTube demo. It shows the recorded replay, either on the live GitHub Pages site, [https://dathickboy.github.io/spectral-risk-chimera/](https://dathickboy.github.io/spectral-risk-chimera/), or served locally:
 
 ```bash
 npm run build
@@ -41,11 +41,11 @@ Recording notes:
 
 ## 1:05–1:25 · Base VaR and exposure
 
-**On screen:** the Base VaR panel (124.10 EUR) and its header parameters (1 day, 95%, as-of date).
+**On screen:** the Base VaR panel (124.10 EUR) and its header parameters (1 day, 95%, as-of date). Then scroll to the Loss distribution below the positions: 20 buckets, the dashed `VaR 95% · 124.10 EUR` marker, and the bucket table.
 
 **Narration:**
 
-> Base VaR is a one-day, 95% historical simulation: 250 daily returns, with a documented quantile method. Here it is 124.10 euros. That is a percentile loss estimate, not a worst case. The result is content-hashed, so the same inputs reproduce the same snapshot.
+> Base VaR is a one-day, 95% historical simulation: 250 daily returns, with a documented quantile method. Here it is 124.10 euros. That is a percentile loss estimate, not a worst case. The loss distribution shows those same 250 scenarios in 20 buckets, with the marker at the exact quantile. It is a view of the Base VaR scenarios, not a second risk method. The result is content-hashed, so the same inputs reproduce the same snapshot.
 
 ## 1:25–1:50 · ECB published versus derived rates
 
@@ -57,11 +57,11 @@ Recording notes:
 
 ## 1:50–2:10 · Why Adjusted VaR is unavailable
 
-**On screen:** the Sentiment-Adjusted VaR panel showing `Unavailable` and its reason. Then the SEC Filing Risk panel showing that it is not configured.
+**On screen:** the Market Sentiment panel: DEMO-UK `-0.72` with `CURRENT` and `DEMO` badges and "latest observation, not an aggregated index". Then the Sentiment-Adjusted VaR panel showing `Unavailable` and its reason. Then the SEC Filing Risk panel showing that it is not configured.
 
 **Narration:**
 
-> The sentiment adjustment engine is built and tested, but no method for aggregating sentiment has been approved yet. That is an open decision, OD-1. So Adjusted VaR shows Unavailable, with that reason. It does not show a copy of Base VaR, and it does not show zero. SEC filing analysis is not connected in this version either, so that panel says so instead of inventing a score.
+> These sentiment values are invented demo observations, labelled DEMO. Each is a single latest observation, not a market sentiment index. The sentiment adjustment engine is built and tested, but no method for aggregating sentiment has been approved yet. That is an open decision, OD-1. Demo sentiment is never used: even DEMO-UK at minus 0.72, below the minus 0.60 trigger, changes nothing. So Adjusted VaR shows Unavailable, with that reason. It does not show a copy of Base VaR, and it does not show zero. SEC filing analysis is not connected in this version either, so that panel says so instead of inventing a score.
 
 ## 2:10–2:25 · Recorded replay and reproducibility
 
