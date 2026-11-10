@@ -9,6 +9,9 @@ import { AdjustedVarPanel, BaseVarPanel, FilingPanel, SentimentPanel } from './c
 import { CurrencyExposureSection, FxSection, PositionsSection } from './components/Sections.tsx';
 import { SummarySection } from './components/Summary.tsx';
 import { TopBar } from './components/TopBar.tsx';
+import { TourCard } from './components/TourCard.tsx';
+import { tourSteps } from './tour.js';
+import type { TourAnchor } from './tour.js';
 import type { LiveUpdateFactory, LiveUpdates } from './data/liveUpdates.js';
 import type { DashboardDataSource, LoadError, SourceInfo } from './data/source.js';
 import { LiveContext } from './live.tsx';
@@ -155,6 +158,27 @@ export function App({
   const reload = useCallback(() => setGeneration((n) => n + 1), []);
   const data = view.status === 'ready' ? view.data : undefined;
 
+  // Guided tour (ui-guidelines §8): user-started, non-modal, one inline card above its section.
+  const [tourIndex, setTourIndex] = useState<number | null>(null); // a step position, not a financial value
+  const steps = data === undefined ? [] : tourSteps(data, info);
+  const current = tourIndex === null ? undefined : steps[tourIndex];
+  const endTour = useCallback(() => {
+    setTourIndex(null);
+    document.getElementById('tour-start')?.focus();
+  }, []);
+  const toggleTour = useCallback(() => setTourIndex((i) => (i === null ? 0 : null)), []);
+  const tourAt = (anchor: TourAnchor): ReactElement | null =>
+    current === undefined || tourIndex === null || current.anchor !== anchor ? null : (
+      <TourCard
+        step={current}
+        index={tourIndex}
+        count={steps.length}
+        onBack={() => setTourIndex((i) => (i === null || i === 0 ? i : i - 1))}
+        onNext={() => setTourIndex((i) => (i === null || i >= steps.length - 1 ? i : i + 1))}
+        onEnd={endTour}
+      />
+    );
+
   return (
     <LiveContext.Provider value={live}>
       <div className="app">
@@ -169,6 +193,8 @@ export function App({
           onReload={reload}
           data={data}
           refreshError={refreshError}
+          onTour={toggleTour}
+          tourActive={current !== undefined}
         />
         {/* tabIndex -1: the skip link moves keyboard focus here, not only the scroll position. */}
         <main id="main" tabIndex={-1} aria-busy={view.status === 'loading'}>
@@ -192,6 +218,7 @@ export function App({
           ) : null}
           {data !== undefined ? (
             <>
+              {tourAt('summary')}
               <SummarySection data={data} />
               {data.dataMode === 'DEMO' ? (
                 <p className="demo-banner" role="note">
@@ -199,6 +226,7 @@ export function App({
                   labelled DEMO_DATA and never raise alerts.
                 </p>
               ) : null}
+              {tourAt('panels')}
               <div className="panels">
                 <BaseVarPanel data={data} />
                 <AdjustedVarPanel data={data} />
@@ -207,7 +235,9 @@ export function App({
               </div>
               {/* S5 order (ui-guidelines §3): positions, then charts, then supporting detail.
                   Currency exposure is followed by the FX rates behind it. */}
+              {tourAt('positions')}
               <PositionsSection data={data} />
+              {tourAt('loss')}
               <LossDistributionSection data={data} />
               {/* Full width: at half width the exact FX rates wrap into unreadable columns. */}
               <CurrencyExposureSection data={data} />

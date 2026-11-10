@@ -179,6 +179,29 @@ describe('boundaries', () => {
     expect(h.buckets.reduce((total, b) => total + b.count, 0)).toBe(values.length);
     expect(h.buckets).toHaveLength(20);
   });
+
+  it('signed zeros: the marker bucket index is +0 in every input order (PR #5 CI counterexample)', () => {
+    // Exact shrunk counterexample from CI run 42878993606: ["-0","-0","0"] vs ["0","-0","-0"],
+    // K = 1, m = 0. Hand-calculated: span 0 -> width one minor unit = 1; one closed bucket
+    // [0, 1] with all 3 scenarios; Type 7 quantile of three zeros = 0; nothing strictly above.
+    // Before the fix, the order with "0" first gave varBucketIndex -0 (the offset "-0" - "0").
+    const expected = {
+      width: '1',
+      buckets: [['0', '1', ']', 3]],
+      raw: '0',
+      varBucket: 0,
+      above: 0,
+    };
+    for (const order of [
+      ['-0', '-0', '0'],
+      ['0', '-0', '-0'],
+    ]) {
+      const h = run(order, 1, 0);
+      expect(plain(h)).toMatchObject(expected);
+      expect(Object.is(h.varBucketIndex, 0), `${order.join(',')}: index is +0`).toBe(true);
+      expect(toCanonical(h.markerPosition)).toBe('0');
+    }
+  });
 });
 
 describe('negative values (all scenarios are gains)', () => {

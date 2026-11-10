@@ -585,16 +585,28 @@ describe('accessibility and layout', () => {
       const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
       return (hi + 0.05) / (lo + 0.05);
     };
-    for (const surface of ['color-bg', 'color-panel', 'color-raised']) {
+    for (const surface of [
+      'color-bg',
+      'color-panel',
+      'color-panel-navy',
+      'color-raised',
+      'color-row-hover',
+    ]) {
       for (const fg of [
         'color-text',
         'color-text-secondary',
         'color-warning',
         'color-accent',
+        'color-info',
         'color-critical',
       ]) {
         expect(contrast(token(fg), token(surface)), `${fg} on ${surface}`).toBeGreaterThanOrEqual(4.5);
       }
+      // Non-text graphic (WCAG 1.4.11, 3:1): red is used only as the error-state border.
+      expect(
+        contrast(token('color-negative'), token(surface)),
+        `color-negative on ${surface}`,
+      ).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -688,5 +700,37 @@ describe('S5 final polish', () => {
     expect(css).toMatch(
       /\.loss-chart \{[^}]*min-width: var\(--chart-min-width\);[^}]*max-width: var\(--chart-max-width\)/,
     );
+  });
+});
+
+describe('public-site review fixes', () => {
+  it('the exact bucket table is behind a closed native disclosure; the summary and chart stay visible', async () => {
+    const { container } = await show();
+    const loss = container.querySelector('[data-testid="loss-distribution"]') as HTMLElement;
+    const details = loss.querySelector('[data-testid="loss-table-details"]');
+    expect(details).toBeInstanceOf(HTMLDetailsElement);
+    expect((details as HTMLDetailsElement).open).toBe(false);
+    expect(details?.querySelector('summary')?.textContent).toBe('Exact bucket table (4 buckets)');
+    expect(details?.querySelector('[data-testid="loss-table"]')).not.toBeNull();
+    // Outside the disclosure: the chart (with its description) and the text summary.
+    expect(details?.contains(loss.querySelector('[data-testid="loss-chart"]'))).toBe(false);
+    expect(details?.contains(loss.querySelector('[data-testid="loss-summary"]'))).toBe(false);
+  });
+
+  it('axe-core finds no violations with the bucket table and the Adjusted VaR details open', async () => {
+    const { container } = await show();
+    for (const id of ['loss-table-details', 'adjusted-var-details']) {
+      (container.querySelector(`[data-testid="${id}"]`) as HTMLDetailsElement).open = true;
+    }
+    const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
+    expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
+  });
+
+  it('an open summary help panel takes its own row below the label instead of displacing the figures', () => {
+    expect(css).toMatch(/\.summary-figure dt \.help \{\s*display: contents;/);
+    expect(css).toMatch(/\.summary-figure dt \.help-panel \{\s*flex-basis: 100%;/);
+    expect(css).toMatch(/\.summary-figure:has\(\.help-panel\) \{\s*flex: 1 1 100%;/);
+    expect(css).toMatch(/\.summary-figure:has\(\.help-panel\) dt \{\s*display: block;/);
+    expect(css).toMatch(/\.summary-figure dd \{\s*text-align: left;/);
   });
 });

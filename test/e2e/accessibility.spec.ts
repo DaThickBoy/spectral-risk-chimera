@@ -17,8 +17,8 @@ import type { Page } from '@playwright/test';
 
 const BASE = '/spectral-risk-chimera/';
 const AXE_SOURCE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
-/** `--color-accent` (#4c8dff) as computed by the browser. */
-const ACCENT = 'rgb(76, 141, 255)';
+/** `--color-accent` (teal #2ec4b6, ui-guidelines §1) as computed by the browser. */
+const ACCENT = 'rgb(46, 196, 182)';
 const PHONE = { width: 390, height: 844 };
 
 /**
