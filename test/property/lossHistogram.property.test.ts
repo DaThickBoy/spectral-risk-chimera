@@ -133,28 +133,35 @@ describe('Property: loss histogram exactness (A2)', () => {
     );
   });
 
-  it('does not depend on the input order', () => {
-    fc.assert(
-      fc.property(
-        lossesArb.chain((texts) =>
-          fc.tuple(fc.constant(texts), fc.shuffledSubarray(texts, { minLength: texts.length })),
-        ),
-        kArb,
-        mArb,
-        ([texts, shuffled], k, m) => {
-          const a = compute(texts, k, m, '0.95');
-          const b = compute(shuffled, k, m, '0.95');
-          const text = (h: LossHistogram) => ({
-            width: toCanonical(h.width),
-            buckets: h.buckets.map((x) => [toCanonical(x.lower), toCanonical(x.upper), x.count]),
-            raw: toCanonical(h.rawQuantile),
-            above: h.scenariosAboveVaR,
-            idx: h.varBucketIndex,
-          });
-          expect(text(b)).toEqual(text(a));
-        },
+  /** Order independence; shared by the random run and the deterministic CI replay below. */
+  const orderIndependence = () =>
+    fc.property(
+      lossesArb.chain((texts) =>
+        fc.tuple(fc.constant(texts), fc.shuffledSubarray(texts, { minLength: texts.length })),
       ),
-      RUNS,
+      kArb,
+      mArb,
+      ([texts, shuffled], k, m) => {
+        const a = compute(texts, k, m, '0.95');
+        const b = compute(shuffled, k, m, '0.95');
+        const text = (h: LossHistogram) => ({
+          width: toCanonical(h.width),
+          buckets: h.buckets.map((x) => [toCanonical(x.lower), toCanonical(x.upper), x.count]),
+          raw: toCanonical(h.rawQuantile),
+          above: h.scenariosAboveVaR,
+          idx: h.varBucketIndex,
+        });
+        expect(text(b)).toEqual(text(a));
+      },
     );
+
+  it('does not depend on the input order', () => {
+    fc.assert(orderIndependence(), RUNS);
+  });
+
+  it('replays the PR #5 CI counterexample deterministically (seed -2078451211, path 253:3:3)', () => {
+    // From CI run 42878993606: shrunk counterexample [["-0","-0","0"],["0","-0","-0"]], K = 1,
+    // m = 0. The marker bucket index was -0 in one order and 0 in the other.
+    fc.assert(orderIndependence(), { seed: -2078451211, path: '253:3:3', endOnFailure: true });
   });
 });

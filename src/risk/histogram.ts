@@ -86,7 +86,9 @@ function bucketIndex(x: Decimal, min: Decimal, width: Decimal, k: number): numbe
   // index only, not a financial value
   let i = x.minus(min).dividedBy(width).floor().toNumber();
   if (i > k - 1) i = k - 1;
-  if (i < 0) i = 0;
+  // `<= 0`, not `< 0`: a signed-zero offset ("-0" minus "0") floors to -0, which `< 0` misses.
+  // Assigning 0 normalizes the index to +0 so it never depends on which zero sorted first.
+  if (i <= 0) i = 0;
   // Correct a rounded division with exact comparisons against the edges.
   while (i > 0 && min.plus(width.times(fromInt(i))).greaterThan(x)) i -= 1;
   while (i < k - 1 && min.plus(width.times(fromInt(i + 1))).lessThanOrEqualTo(x)) i += 1;
