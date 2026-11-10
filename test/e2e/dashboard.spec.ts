@@ -304,6 +304,79 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
       expectClean(w);
     });
   }
+
+  // Judge review P1: step 4 opened with its heading at the bottom edge, so focus did not scroll
+  // and its explanation and controls stayed below the fold. Every step must open fully visible.
+  for (const portfolio of ['demo-eur-usd-gbp', 'demo-eur-only']) {
+    test(`guided tour at 1440 px (${portfolio}): each step's explanation and controls are visible without scrolling`, async ({
+      page,
+    }) => {
+      const w = watch(page);
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.goto(`${BASE}?portfolio=${portfolio}`);
+      await expect(page.getByTestId('summary')).toBeVisible();
+      await page.getByTestId('tour-start').click();
+      const card = page.getByTestId('tour-card');
+      for (let step = 1; step <= 6; step += 1) {
+        await expect(card).toContainText(`Guided tour · step ${String(step)} of 6`);
+        // The whole card (explanation and all three controls) is inside the viewport.
+        await expect(card, `step ${String(step)} card`).toBeInViewport({ ratio: 1 });
+        for (const name of ['Back', step === 6 ? 'Finish' : 'Next', 'End tour']) {
+          await expect(card.getByRole('button', { name }), `step ${String(step)} ${name}`).toBeInViewport({
+            ratio: 1,
+          });
+        }
+        await expect(card.getByRole('heading', { level: 2 })).toBeFocused();
+        if (step === 4) {
+          for (const line of await card.locator('.tour-line').all()) {
+            await expect(line, 'step 4 explanation').toBeInViewport({ ratio: 1 });
+          }
+          await expect(card).toContainText('fixed 0–100 % axis');
+        }
+        if (step < 6) await page.getByTestId('tour-next').click();
+      }
+      await page.getByTestId('tour-next').click(); // Finish
+      await expect(card).toHaveCount(0);
+      await expect(page.getByTestId('tour-start')).toBeFocused();
+      expectClean(w);
+    });
+  }
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`headline figures at ${String(viewport.width)} px: NAV primary, Base VaR separated and secondary`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(BASE);
+      await expect(page.getByTestId('summary-nav')).toHaveText('22375.74 EUR');
+      await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
+      const m = (await page.evaluate(`(() => {
+        const nav = document.querySelector('[data-testid="summary-nav"]');
+        const bv = document.querySelector('[data-testid="summary-base-var"]');
+        const fig = bv.closest('.summary-figure');
+        const text = (el) => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect(); };
+        return {
+          navPx: parseFloat(getComputedStyle(nav).fontSize),
+          varPx: parseFloat(getComputedStyle(bv).fontSize),
+          gap: text(bv).left - text(nav).right,
+          sameRow: Math.abs(text(bv).top - text(nav).top) < 20,
+          divider: getComputedStyle(fig).borderLeftStyle,
+        };
+      })()`)) as { navPx: number; varPx: number; gap: number; sameRow: boolean; divider: string };
+      expect(m.varPx).toBeLessThan(m.navPx); // NAV primary, Base VaR secondary
+      if (viewport.width === 1440) {
+        expect(m.sameRow).toBe(true);
+        expect(m.divider).toBe('solid');
+        expect(m.gap).toBeGreaterThanOrEqual(40); // was about 23 px before the review fix
+      } else {
+        expect(m.sameRow).toBe(false); // stacked on the phone
+        expect(m.divider).toBe('none');
+      }
+    });
+  }
 });
 
 test.describe('states', () => {

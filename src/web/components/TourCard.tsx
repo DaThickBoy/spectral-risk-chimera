@@ -14,9 +14,24 @@ export function TourCard(props: {
   readonly onEnd: () => void;
 }): ReactElement {
   const titleId = useId();
+  const card = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    heading.current?.focus();
+    // Focus alone does not scroll when the heading is already on screen (for example a card
+    // that starts near the bottom of the viewport), which left the explanation and controls
+    // below the fold. Focus without scrolling, then position the card explicitly:
+    // - fully visible already: leave the page where it is (no jump between nearby steps);
+    // - otherwise: align the card to the top, so its explanation, its controls, and the
+    //   section it explains (directly below it) are all on screen.
+    // `instant` never animates, which also satisfies prefers-reduced-motion. jsdom has no
+    // scrollIntoView, so the call is guarded.
+    heading.current?.focus({ preventScroll: true });
+    const element = card.current;
+    if (element !== null && typeof element.scrollIntoView === 'function') {
+      const box = element.getBoundingClientRect();
+      const fullyVisible = box.top >= 0 && box.bottom <= window.innerHeight;
+      if (!fullyVisible) element.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
+    }
   }, [props.index]);
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (event.key === 'Escape') {
@@ -26,7 +41,13 @@ export function TourCard(props: {
   };
   const last = props.index === props.count - 1;
   return (
-    <section className="tour-card" aria-labelledby={titleId} onKeyDown={onKeyDown} data-testid="tour-card">
+    <section
+      ref={card}
+      className="tour-card"
+      aria-labelledby={titleId}
+      onKeyDown={onKeyDown}
+      data-testid="tour-card"
+    >
       {/* Visual progress line; screen readers get the same words inside the heading, which is
           where focus lands on every step (and which names the region, so it never duplicates
           the name of the section it explains). */}
