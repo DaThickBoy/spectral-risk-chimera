@@ -122,6 +122,51 @@ export function allocationBars(
   });
 }
 
+/** One position's arc on the allocation ring (fintech redesign). Geometry only. */
+export interface AllocationArc {
+  readonly ticker: string;
+  /** The adapter width (percent of the fixed 0–100 % ring) this arc draws. */
+  readonly pct: number;
+  /** SVG stroke-dasharray / stroke-dashoffset for a circle of the given radius. */
+  readonly dasharray: string;
+  readonly dashoffset: string;
+  /** Where the arc's number label sits (centre of the arc). */
+  readonly labelX: number;
+  readonly labelY: number;
+}
+
+/**
+ * The allocation ring: each plotted bar becomes an arc on a fixed 0–100 % ring, in backend order,
+ * starting at 12 o'clock. It uses the widths `allocationBars` already produced, so nothing new is
+ * derived from a financial value; the cumulative position and the trigonometry are pixel geometry
+ * only (the unfilled rest of the ring is never measured or labelled with a number). Only bars with
+ * a width are drawn; the caller shows bars instead when any allocation is missing.
+ */
+export function allocationArcs(
+  bars: readonly AllocationBar[],
+  ring: { readonly radius: number; readonly center: number; readonly labelRadius: number },
+): AllocationArc[] {
+  const circumference = 2 * Math.PI * ring.radius; // pixel geometry, not a financial value
+  const arcs: AllocationArc[] = [];
+  let startPct = 0; // running pixel position on the ring, not a financial value
+  for (const bar of bars) {
+    if (bar.widthPct === null) continue;
+    const length = (bar.widthPct / 100) * circumference;
+    const gap = length > 4 ? 2 : 0; // a small visual gap between segments
+    const mid = ((startPct + bar.widthPct / 2) / 100) * 2 * Math.PI - Math.PI / 2;
+    arcs.push({
+      ticker: bar.ticker,
+      pct: bar.widthPct,
+      dasharray: `${String(length - gap)} ${String(circumference)}`,
+      dashoffset: String(-((startPct / 100) * circumference)),
+      labelX: ring.center + ring.labelRadius * Math.cos(mid),
+      labelY: ring.center + ring.labelRadius * Math.sin(mid),
+    });
+    startPct += bar.widthPct;
+  }
+  return arcs;
+}
+
 /** One currency's exposure bar (roadmap S3): a CSS width in percent of the axis. */
 export interface ExposureBar {
   readonly currency: string;

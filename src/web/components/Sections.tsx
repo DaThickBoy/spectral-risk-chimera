@@ -4,7 +4,6 @@
 import type { ReactElement } from 'react';
 import type { DashboardViewResponse } from '../../shared/apiContracts/index.js';
 import { MISSING, codeLabel, percentText, utcText, withUnit } from '../format.js';
-import { AllocationChart } from './AllocationChart.tsx';
 import { ExposureChart } from './ExposureChart.tsx';
 import { Help } from './Help.tsx';
 import { Badge, toneOf } from './Badge.tsx';
@@ -180,7 +179,6 @@ export function PositionsSection({ data }: { readonly data: View }): ReactElemen
   return (
     <section className="section" aria-labelledby="positions-title">
       <h2 id="positions-title">Positions and allocation</h2>
-      <AllocationChart data={data} />
       {/* Focusable so keyboard users can scroll the table on narrow screens (WCAG 2.1.1). */}
       <div className="table-wrap" role="region" aria-label="Positions table, scrollable" tabIndex={0}>
         <table>

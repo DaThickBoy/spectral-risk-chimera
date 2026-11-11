@@ -1,47 +1,52 @@
 /*
- * Dashboard styles (task 17.2; ui-guidelines.md §1). Dark theme only; every colour, size, and
- * spacing value is a design token. Charcoal and deep-navy layers, 1px borders, one teal accent
- * for interaction, blue for information only, amber for warnings only, red for errors and
- * adverse risk. No decorative animation; transitions are disabled under prefers-reduced-motion.
+ * Dashboard styles (task 17.2; ui-guidelines.md §1). Light theme (D1): a light canvas with white
+ * cards in `:root`, and a `.theme-dark` scope that re-declares the same tokens for the navy
+ * sidebar and chart surfaces. Every colour, size, and spacing value is a design token. 1px
+ * borders, one teal accent for interaction, blue for information only, amber for warnings only,
+ * red for errors and adverse risk. No decorative animation; transitions are disabled under
+ * prefers-reduced-motion.
  */
 :root {
-  /* Surfaces: charcoal foundation, navy headline and raised layers */
-  --color-bg: #0b0e13;
-  --color-panel: #12161d;
-  --color-panel-navy: #101a29;
-  --color-raised: #18202e;
-  --color-border: #232d3c;
-  --color-border-strong: #34435a;
-  --color-border-subtle: #1b2330; /* supporting sections: lighter separation than primary surfaces */
-  --color-row-hover: #151d2a;
+  /* Fintech redesign (ui-guidelines §1): light canvas, white elevated cards. The navy sidebar
+     and chart surfaces re-declare these tokens in `.theme-dark` below. */
+  --color-bg: #f3f5f9;
+  --color-panel: #ffffff;
+  --color-panel-navy: #ffffff; /* headline surface (the summary); navy inside .theme-dark */
+  --color-raised: #f1f4f9;
+  --color-border: #e2e7ef;
+  --color-border-strong: #c9d2df;
+  --color-border-subtle: #e9edf3;
+  --color-row-hover: #f6f8fb;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 6%), 0 4px 16px rgb(16 24 40 / 5%);
+  --radius-card: 12px;
   /* Text */
-  --color-text: #e6e9ef;
-  --color-text-secondary: #9aa3b2;
-  --color-text-muted: #6b7482;
-  /* Interaction: the one accent (focus, hover, selected) */
-  --color-accent: #2ec4b6;
+  --color-text: #111a2e;
+  --color-text-secondary: #4b5567;
+  --color-text-muted: #667085;
+  /* Interaction: the one accent (focus, hover, selected); darker teal for light surfaces */
+  --color-accent: #0f766e;
   /* Information: provenance (DEMO) and informational badges; never interaction, never risk */
-  --color-info: #4c8dff;
+  --color-info: #1d4ed8;
   /* Semantic states (always with a text label) */
-  --color-positive: #2fbf71;
-  --color-negative: #e5484d;
-  --color-warning: #f5a524;
-  --color-high: #ff7a45;
-  --color-critical: #ff4d6d;
-  --color-critical-bg: #2a1218;
-  /* Charts (neutral data marks; the accent stays reserved for interaction) */
-  --chart-bar: #8b9cb6; /* neutral slate-blue data mark, 6.5:1 on panels */
-  --chart-grid: #222c3b;
-  /* Allocation composition: neutral, non-semantic slate shades (each at least 3:1 on panels);
-     segments are also separated by a gap, and the legend carries every value as text. */
-  /* Each shade also carries dark position numbers at 4.5:1 or more. */
-  --chart-seq-1: #8b9cb6;
-  --chart-seq-2: #6a7fa0;
-  --chart-seq-3: #b7c3d5;
-  --chart-seq-4: #c9d3e1;
-  --chart-seq-5: #7b8eab;
-  --chart-seq-6: #a1afc4;
-  --chart-seq-ink: #0b0e13;
+  --color-positive: #15803d;
+  --color-negative: #c62828;
+  --color-warning: #b45309;
+  --color-high: #c2410c;
+  --color-critical: #be123c;
+  --color-critical-bg: #fde8ee;
+  /* Charts: data marks. Categorical shades are blue, green, and violet (never a status colour);
+     orange is reserved for the VaR marker and tail, always with a text label. */
+  --chart-bar: #2f62d6;
+  --chart-grid: #e5e9f0;
+  --chart-tail: #c2410c;
+  /* Categorical position shades: each at least 3:1 on white, with white numbers at 4.5:1. */
+  --chart-seq-1: #2f62d6;
+  --chart-seq-2: #12805c;
+  --chart-seq-3: #6b4fd0;
+  --chart-seq-4: #1e4aa8;
+  --chart-seq-5: #0b6347;
+  --chart-seq-6: #4f37a8;
+  --chart-seq-ink: #ffffff;
   --chart-axis: var(--color-text-muted);
   --chart-marker: var(--color-text);
   --chart-min-width: 600px;
@@ -940,35 +945,7 @@ thead th {
   border-left: 0;
 }
 
-/* Allocation composition: one bar of side-by-side segments plus a labelled legend. */
-.composition {
-  display: flex;
-  height: 20px;
-  margin: var(--space-2) 0 var(--space-3);
-  background: var(--color-raised);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.composition-segment {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  min-width: 0;
-  color: var(--chart-seq-ink);
-  font-family: var(--font-num);
-  font-size: var(--size-label);
-  font-weight: 700;
-  line-height: 1;
-  height: 100%;
-  box-shadow: inset -2px 0 0 var(--color-panel); /* a gap that does not change any width */
-}
-
-.composition-segment:last-child {
-  box-shadow: none;
-}
-
+/* Allocation composition: the labelled legend beside the allocation ring. */
 .composition-legend {
   list-style: none;
   margin: 0;
@@ -1183,41 +1160,430 @@ thead th {
   margin-top: 0;
 }
 
-@media (min-width: 1100px) {
-  .loss-layout {
-    grid-template-columns: minmax(600px, 800px) minmax(16rem, 1fr);
-    grid-template-rows: auto 1fr;
-    gap: var(--space-3) var(--space-5);
+/* =============================================================================================
+   Fintech redesign (ui-guidelines §1, §3). Layout and surfaces only: no value is changed,
+   rounded, or computed here.
+   ============================================================================================= */
+
+/* Dark scope: the navy sidebar and chart surfaces re-declare the tokens, so every existing child
+   style (badges, disclosures, help, tables, focus ring) renders correctly on navy. */
+.theme-dark {
+  --color-bg: #0a1426;
+  --color-panel: #0f1d38;
+  --color-panel-navy: #0f1d38;
+  --color-raised: #172a4d;
+  --color-border: #263b60;
+  --color-border-strong: #34507f;
+  --color-border-subtle: #1c3054;
+  --color-row-hover: #142546;
+  --color-text: #e8edf6;
+  --color-text-secondary: #a7b3c8;
+  --color-text-muted: #8492a9;
+  --color-accent: #2ec4b6;
+  --color-info: #8fb0ff;
+  --color-positive: #3ccf86;
+  --color-negative: #ff7b7b;
+  --color-warning: #f5a524;
+  --color-high: #ff8a5c;
+  --color-critical: #ff7a93;
+  --color-critical-bg: #3a1622;
+  --chart-bar: #6f9bff;
+  --chart-grid: #2a4068;
+  --chart-tail: #f59e42;
+  --chart-axis: #8492a9;
+  --chart-marker: #f59e42;
+  color: var(--color-text);
+}
+
+/* Shell: navy sidebar on the left, the light workspace on the right. */
+.app {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-areas:
+    'side head'
+    'side main';
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+
+.topbar {
+  grid-area: side;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  padding: var(--space-5) var(--space-4);
+  background: var(--color-panel);
+  border: 0;
+  border-radius: 0;
+}
+
+.brand {
+  align-items: flex-start;
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.mark {
+  color: var(--color-info);
+}
+
+.topbar-facts {
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.topbar-facts dt {
+  font-size: var(--size-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sidebar-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-1);
+}
+
+.sidebar-nav a {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.sidebar-nav a:hover {
+  color: var(--color-text);
+  background: var(--color-raised);
+}
+
+/* Section headings reached from the sidebar keep a little space above them. */
+main h2[id] {
+  scroll-margin-top: var(--space-4);
+}
+
+.page-header {
+  grid-area: head;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-5) 32px var(--space-2);
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.page-subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-secondary);
+}
+
+main {
+  grid-area: main;
+  min-width: 0;
+  padding: var(--space-2) 32px 40px;
+}
+
+/* Cards: white, elevated, rounded; a hairline border keeps them crisp on the light canvas. */
+.section,
+.panel,
+.summary {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.panel-primary {
+  border-color: var(--color-border-strong);
+}
+
+/* The summary frames the KPI cards; the cards carry the elevation. */
+.summary {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: stretch; /* equal-height cards (the base .summary-figures rule aligns to the end) */
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+}
+
+/* A long reason badge wraps inside its KPI card or risk-signal card instead of overflowing it
+   (for example "AGGREGATION NOT APPROVED · OD-1" in a two-column card at tablet widths). */
+.kpi-note .badge,
+.panels .badge {
+  white-space: normal;
+}
+
+.kpi-grid > .summary-figure,
+.kpi-grid > .summary-primary + .summary-primary,
+.kpi-grid > .summary-primary + .summary-figure:not(.summary-primary) {
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* Each card is a column: the label takes the free space, so every value sits on the same line
+   across the row even when a label wraps (badge and help button). */
+.kpi-grid > .summary-figure {
+  display: flex;
+  flex-direction: column;
+}
+
+.kpi-grid > .summary-figure dt {
+  flex: 1 0 auto;
+  align-content: flex-start;
+  font-size: var(--size-label);
+  letter-spacing: 0.02em;
+}
+
+.kpi-grid > .summary-figure dd {
+  margin-top: var(--space-2);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* NAV is the primary figure, Base VaR the secondary headline figure. */
+.kpi-grid > .summary-primary dd {
+  font-size: 30px;
+}
+
+.kpi-grid > .summary-primary + .summary-primary dd {
+  font-size: 26px;
+}
+
+.kpi-grid > .summary-figure .kpi-note {
+  margin-top: var(--space-2);
+  font-size: var(--size-label);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* A KPI with an open help panel spans the row (the help explanation stays below its label). */
+.kpi-grid > .summary-figure:has(.help-panel) {
+  grid-column: 1 / -1;
+}
+
+.exposure-strip {
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  gap: var(--space-3) 40px;
+}
+
+.exposure-strip .summary-figure + .summary-figure,
+.exposure-strip > .summary-primary + .summary-figure:not(.summary-primary) {
+  padding-left: 0;
+  border-left: 0;
+}
+
+/* Main visualisations: the loss distribution beside the allocation ring. */
+.viz-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.viz-grid > .section {
+  margin-bottom: 0;
+}
+
+.chart-surface {
+  background: var(--color-panel);
+  border: 0;
+  padding: var(--space-5);
+}
+
+.chart-surface .loss-chart {
+  max-width: none;
+}
+
+/* Narrow screens: the compact frame is drawn near 1:1, so no minimum width and no scrolling. */
+.loss-chart.loss-chart-compact {
+  min-width: 0;
+}
+
+.chart-bar-tail {
+  fill: var(--chart-tail);
+}
+
+.legend-tail {
+  background: var(--chart-tail);
+}
+
+.chart-marker-label {
+  fill: var(--chart-marker);
+}
+
+/* Allocation ring. */
+.donut {
+  display: block;
+  width: min(100%, 240px);
+  height: auto;
+  margin: var(--space-2) auto var(--space-4);
+}
+
+.donut-track,
+.donut-arc {
+  fill: none;
+  stroke-width: 30;
+}
+
+.donut-track {
+  stroke: var(--color-border);
+}
+
+.donut-arc.seq-1 {
+  stroke: var(--chart-seq-1);
+}
+
+.donut-arc.seq-2 {
+  stroke: var(--chart-seq-2);
+}
+
+.donut-arc.seq-3 {
+  stroke: var(--chart-seq-3);
+}
+
+.donut-arc.seq-4 {
+  stroke: var(--chart-seq-4);
+}
+
+.donut-arc.seq-5 {
+  stroke: var(--chart-seq-5);
+}
+
+.donut-arc.seq-6 {
+  stroke: var(--chart-seq-6);
+}
+
+.donut-label {
+  fill: var(--chart-seq-ink);
+  font-family: var(--font-num);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.donut-center {
+  fill: var(--color-text);
+  font-family: var(--font-num);
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.donut-center-label {
+  fill: var(--color-text-secondary);
+  font-size: var(--size-label);
+}
+
+.viz-allocation .composition-legend {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1100px) {
+  .viz-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'side'
+      'head'
+      'main';
+    grid-template-rows: auto auto 1fr;
   }
 
-  /* The hairline sits on the chart column's right edge, spanning both rows, so the supporting
-     column reads as one continuous column beside the chart. */
-  .loss-main {
-    grid-column: 1;
-    grid-row: 1 / span 2;
-    padding-right: var(--space-5);
-    border-right: 1px solid var(--color-border-subtle);
+  .topbar {
+    position: static;
+    height: auto;
+    overflow: visible;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
   }
 
-  /* The side column: summary on row 1, the closed disclosure under it on row 2. */
-  .loss-side {
-    grid-column: 2;
-    grid-row: 1;
-    padding-top: var(--space-2);
+  .topbar-facts {
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 
-  .loss-details {
-    grid-column: 2;
-    grid-row: 2;
-    align-self: start;
+  /* Compact header on phones: the section links are hidden (and so leave the Tab order). */
+  .sidebar-nav {
+    display: none;
   }
 
-  /* Opened: the full bucket table needs the card width, so the disclosure moves below both. */
-  .loss-details[open] {
+  .page-header {
+    padding: var(--space-4) var(--space-4) var(--space-2);
+  }
+
+  main {
+    padding: var(--space-2) var(--space-4) var(--space-5);
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .kpi-grid > .summary-primary {
     grid-column: 1 / -1;
-    grid-row: 3;
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .kpi-grid > .summary-figure,
+  .kpi-grid > .summary-primary + .summary-primary,
+  .kpi-grid > .summary-primary + .summary-figure:not(.summary-primary) {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .kpi-grid > .summary-figure dd {
+    font-size: 18px;
+  }
+
+  .kpi-grid > .summary-primary dd {
+    font-size: 26px;
+  }
+
+  .kpi-grid > .summary-primary + .summary-primary dd {
+    font-size: 22px;
+  }
+
+  .chart-surface {
+    padding: var(--space-4);
   }
 }
 
