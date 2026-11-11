@@ -31,7 +31,7 @@ describe('Pages workflow', () => {
       'run: npm test',
       'run: npm run build',
       'run: npm run export:replay',
-      'run: npx playwright install --with-deps chromium',
+      'run: npx playwright install chromium',
       'run: npm run test:e2e',
       'uses: actions/configure-pages@',
       'uses: actions/upload-pages-artifact@',
