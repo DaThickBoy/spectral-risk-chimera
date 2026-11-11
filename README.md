@@ -1,12 +1,18 @@
 # Spectral Risk Chimera
 
-A portfolio risk-monitoring application that stitches together pieces that rarely meet in one app: exact decimal finance, central-bank FX statistics, historical-simulation Value-at-Risk, a sentiment-adjustment engine, SEC filing guards, and a static replay that anyone can open in a browser. **Kiroween 2026 category: Frankenstein.**
+Spectral Risk Chimera helps reviewers understand where a portfolio risk figure comes from. It connects validated CSV transactions, ledger-based positions, currency conversion with published-rate provenance, historical-simulation VaR, and a reproducible recorded dashboard.
 
-> **Status: hackathon demonstration, not a production system.** All market data in the demo is deterministic DEMO fixture data. Production startup is deliberately blocked. Nothing here is investment advice, and the application never trades.
+The dashboard shows portfolio value, allocation, currency exposure, and the scenario losses behind Base VaR. Published ECB quotes and derived conversion rates remain distinguishable. Unavailable calculations carry an explanation.
 
-- Public demo (static recorded replay, DEMO data): [https://dathickboy.github.io/spectral-risk-chimera/](https://dathickboy.github.io/spectral-risk-chimera/). Deployed by the "Pages (static DEMO replay)" workflow from `main` after pull request #2 was merged (2026-11-09). Verified on 2026-11-09: the page loads, and the published `replay/manifest.json` has the same SHA-256 as a local `npm run export:replay`. See [Submission checklist](docs/submission-checklist.md).
-- Kiro usage write-up: [docs/kiro-usage.md](docs/kiro-usage.md)
-- Demo video script: [docs/demo-script.md](docs/demo-script.md)
+**Kiroween 2026 category — Frankenstein.** The integration brings trade ingestion, financial arithmetic, external-data provenance, scenario analysis, and reproducible presentation into one application.
+
+Prices and histories are synthetic DEMO fixtures. The replay uses a fixed reference time and a recorded ECB response. Base VaR models one-day asset-price changes with FX held fixed. Synthetic sentiment does not affect risk, Adjusted VaR remains unavailable under OD-1, and SEC filing analysis is unconfigured.
+
+- [Public demo](https://dathickboy.github.io/spectral-risk-chimera/) — static recorded replay. The dark redesign has been verified locally and awaits release approval. On November 11, 2026, the public site served the earlier interface with identical replay files.
+- [Kiro and Codex contributions](docs/kiro-usage.md)
+- [Devpost draft](docs/devpost-submission.md)
+- [Video script and shot list](docs/demo-script.md)
+- [Submission checklist](docs/submission-checklist.md)
 
 ## Problem and motivation
 
@@ -17,7 +23,7 @@ Risk dashboards often hide the parts that matter most when you have to defend a 
 - Stale inputs shown as current.
 - "Adjusted" figures that quietly fall back to the unadjusted number.
 
-Spectral Risk Chimera takes the opposite approach. Every financial value is an exact decimal string. Every figure carries its provenance and freshness. Anything that cannot be calculated honestly is shown as **Unavailable**, with the reason.
+Financial values use decimal strings at API and storage boundaries. The dashboard reports freshness and provenance where supplied, and explains unavailable calculations.
 
 ## What is implemented
 
@@ -31,7 +37,7 @@ Spectral Risk Chimera takes the opposite approach. Every financial value is an e
 | Sentiment-adjusted VaR     | The adjustment engine is implemented and tested: a configurable bearish threshold and a multiplier on negative scenario P&L. **No sentiment aggregation method is approved (open decision OD-1), so Adjusted VaR is always Unavailable in the demo**, with that reason shown.                                                                                   |
 | SEC filings                | A URL guard and a guarded SEC client exist. **No live SEC analysis is connected** (deferred until after the hackathon); the filing panel shows _Not configured_.                                                                                                                                                                                                |
 | Alerts                     | VaR alert evaluation, a state machine, and an outbox dispatcher. Results built from DEMO data never raise alerts.                                                                                                                                                                                                                                               |
-| Dashboard                  | A React and Vite single-page app with a read-only data path. It renders backend text only and does no financial arithmetic. The same build reads either the local backend or a recorded replay.                                                                                                                                                                 |
+| Dashboard                  | A React and Vite single-page app with a read-only data path. It renders backend financial values and computes only presentation geometry for charts. The same source supports the local backend and recorded replay, with `VITE_DASHBOARD_SOURCE` selecting the mode at Vite serve or build time.                                                               |
 | Persistence                | SQLite through `node:sqlite` (WAL), with forward-only migrations and append-only tables enforced by triggers.                                                                                                                                                                                                                                                   |
 
 ## Three kinds of data in the demo
@@ -42,14 +48,14 @@ Spectral Risk Chimera takes the opposite approach. Every financial value is an e
 | **ECB statistics** (published versus derived) | FX comes from the ECB euro reference rates. The ECB publishes `EUR→X`. The application uses `X→EUR`, computed as `1 / published` at 40 significant digits, and labels that value **Derived**. The published value is shown separately. Source: ECB statistics. The reference rates are published for information purposes only. |
 | **RECORDED REPLAY**                           | The public site shows responses recorded from the real backend at a fixed reference time (2026-11-06 16:00 UTC), using the DEMO fixtures and one recorded ECB response. It is not live data.                                                                                                                                    |
 
-## Base VaR versus Adjusted VaR
+## Reading the redesigned replay
 
-The dashboard shows four separate panels and never merges them: **Base VaR**, **Sentiment-Adjusted VaR**, **Market Sentiment**, and **SEC Filing Risk**.
+The local dark dashboard starts with the portfolio overview and freshness at replay time. The loss distribution and allocation follow, then currency exposure, positions, risk signals, and FX provenance. Allocation shows backend-reported position percentages and a separate cash amount.
 
-- Base VaR is calculated and shown with its parameters and as-of date. It is a percentile-based loss estimate, not a maximum drawdown or a worst case.
-- Adjusted VaR shows **Unavailable** and explains why: no sentiment aggregation method is approved (OD-1). The Base figure is never copied into the Adjusted panel.
-- Market Sentiment shows four invented **DEMO** observations (decision H9), each labelled `CURRENT` and `DEMO`, as the latest observation, not an aggregated index, with its observation time. DEMO sentiment is never eligible for the adjustment and never raises an alert. Even DEMO-UK at -0.72, below the -0.60 threshold, triggers nothing, so Adjusted VaR stays Unavailable (`SENTIMENT_NOT_CURRENT`).
-- Below the positions, a **loss distribution** shows the 250 Base VaR scenario losses in 20 equal-width buckets, with the VaR marker at the raw 95% quantile and a table of every bucket's exact edges and counts. It displays the existing Base VaR scenarios only; it is not a separate risk method.
+- **Base VaR** is a one-day, 95% historical-simulation estimate for asset-price changes with FX held fixed. The histogram shows the same 250 scenario losses in 20 equal-width buckets. The dashed marker locates the raw quantile. Thirteen scenarios exceed the marker in each recorded portfolio. The orange marker bucket also contains observations below the marker.
+- **Adjusted VaR** shows unavailable because no sentiment aggregation method is approved under OD-1.
+- **Market Sentiment** labels synthetic values as demo observations and shows their observation times. These values do not affect the risk calculation.
+- **SEC Filing Risk** is unconfigured in the demo.
 
 ## Quick start (local demo)
 
@@ -131,7 +137,7 @@ CI (`.github/workflows/ci.yml`) runs these on Node.js 24.22.1 and 26, together w
 ## Architecture
 
 ```text
-CSV/FIX import ──► ingestion ──► ledger ──► portfolio (positions, allocation, exposure)
+CSV import ──────► ingestion ──► ledger ──► portfolio (positions, allocation, exposure)
 DEMO fixtures ───► marketdata (series, cleaning, returns) ─┐
 ECB CSV ─────────► adapters/fx ──► fx (FxService, provenance)├─► risk (Historical Simulation VaR, worker)
 sentiment (engine; no approved aggregator) ────────────────┘            │

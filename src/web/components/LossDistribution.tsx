@@ -13,7 +13,7 @@ import { Help } from './Help.tsx';
 type View = DashboardViewResponse;
 
 // Fintech redesign: a taller frame so the histogram is the dashboard's main visual.
-const FRAME: ChartFrame = { width: 640, height: 320, left: 56, right: 16, top: 28, bottom: 52 };
+const FRAME: ChartFrame = { width: 640, height: 360, left: 56, right: 16, top: 28, bottom: 52 };
 // Narrow containers (phones, and tablets where the chart card is under 600 px): a compact frame
 // exactly as wide as the chart's container, so the SVG is drawn at 1:1 and its text stays at its
 // CSS size with no sideways scrolling. Same buckets, marker, tail, and labels; only the pixel
@@ -76,7 +76,7 @@ function Chart(props: {
         Base VaR scenario losses, {String(dist.bucketCount)} buckets, {currency}
       </title>
       <desc id="loss-chart-desc">
-        {`${String(dist.scenarioCount)} daily scenarios. The VaR marker at ${confidence} is ${dist.varMarker.rawQuantile} ${currency}. Scenarios with a larger loss: ${String(dist.varMarker.scenariosAbove)}. The table below lists every bucket.`}
+        {`${String(dist.scenarioCount)} scenarios. The VaR marker at ${confidence} is ${dist.varMarker.rawQuantile} ${currency}. Scenarios with a larger loss: ${String(dist.varMarker.scenariosAbove)}. The table below lists every bucket.`}
       </desc>
       {/* Gridline at the maximum count (existing plot geometry; no value is computed). */}
       <line
@@ -213,8 +213,8 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
                 <span className="legend-swatch legend-bar" /> Scenario losses per bucket
               </span>
               <span className="legend-item">
-                <span className="legend-swatch legend-tail" /> Bucket with the VaR{' '}
-                {confidencePct(dist.confidence)} marker and beyond (tail)
+                <span className="legend-swatch legend-tail" /> Bucket containing the VaR marker and buckets
+                beyond it
               </span>
               <span className="legend-item">
                 <span className="legend-swatch legend-marker" /> VaR {confidencePct(dist.confidence)} (raw
@@ -234,16 +234,19 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
             </div>
           </div>
           <div className="loss-side" data-testid="loss-side">
-            <p className="loss-side-label">Summary</p>
+            <p className="loss-side-label">Scenario analysis</p>
             <p className="caption" data-testid="loss-summary">
               {/* Concise: backend display text only. The exact, unrounded values are in the
                 disclosure below (institutional refinement; nothing is rounded here). */}
-              {String(dist.scenarioCount)} daily scenarios from returns ending {dist.scenarioWindow.firstDate}{' '}
-              to {dist.scenarioWindow.lastDate} (UTC dates), in {String(dist.bucketCount)} buckets of{' '}
+              <strong className="scenario-fraction">
+                {String(dist.varMarker.scenariosAbove)} of {String(dist.scenarioCount)} scenarios exceeded the
+                VaR marker.
+              </strong>
+              {String(dist.scenarioCount)} scenarios from returns ending {dist.scenarioWindow.firstDate} to{' '}
+              {dist.scenarioWindow.lastDate} (UTC dates), in {String(dist.bucketCount)} buckets of{' '}
               {withUnit(dist.widthDisplay, dist.currency)}. VaR {confidencePct(dist.confidence)} marker at{' '}
-              {withUnit(dist.varMarker.rawQuantileDisplay, dist.currency)}. Scenarios with a larger loss than
-              the marker: {String(dist.varMarker.scenariosAbove)}. Not a forecast and not the worst possible
-              loss.
+              {withUnit(dist.varMarker.rawQuantileDisplay, dist.currency)}. The orange bucket containing the
+              marker may include scenarios at or below it. Not a forecast and not the worst possible loss.
             </p>
           </div>
           {/* Progressive disclosure (ui-guidelines §3): the summary above and the chart's own

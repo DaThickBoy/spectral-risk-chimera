@@ -7,6 +7,7 @@
 // `changeOrigin: true` makes the proxy send the backend's own `Host` (127.0.0.1:<backend port>),
 // which the backend's Host guard (Gateway rule 9) requires; the proxied requests are GET only.
 import { defineConfig } from 'vite';
+import { browserNotices } from './scripts/browser-notices.js';
 
 const backend = process.env['SRC_DASHBOARD_BACKEND'];
 
@@ -14,6 +15,7 @@ export default defineConfig({
   root: 'src/web',
   base: './',
   publicDir: 'public',
+  plugins: [browserNotices()],
   oxc: { jsx: { runtime: 'automatic' } },
   build: {
     outDir: '../../dist/web',

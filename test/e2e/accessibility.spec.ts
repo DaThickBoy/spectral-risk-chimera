@@ -18,9 +18,9 @@ import type { Page } from '@playwright/test';
 const BASE = '/spectral-risk-chimera/';
 const AXE_SOURCE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 /** `--color-accent` on light surfaces (teal #0f766e, ui-guidelines §1) as computed by the browser. */
-const ACCENT = 'rgb(15, 118, 110)';
+const ACCENT = 'rgb(98, 212, 232)';
 /** `--color-accent` inside `.theme-dark` (navy sidebar and chart surface: teal #2ec4b6). */
-const ACCENT_ON_NAVY = 'rgb(46, 196, 182)';
+const ACCENT_ON_NAVY = 'rgb(98, 212, 232)';
 const PHONE = { width: 390, height: 844 };
 
 /**
@@ -233,7 +233,15 @@ test.describe('390 px phone viewport', () => {
 
 test.describe('loss chart responsive geometry (regression)', () => {
   const metrics = (page: Page) =>
-    inPage<{ doc: number; card: number; scrolls: boolean; compact: boolean; textPx: number; bars: number }>(
+    inPage<{
+      doc: number;
+      card: number;
+      scrolls: boolean;
+      compact: boolean;
+      textPx: number;
+      bars: number;
+      compactExpected: boolean;
+    }>(
       page,
       `(() => {
         const card = document.querySelector('[data-testid="loss-distribution"]');
@@ -245,6 +253,7 @@ test.describe('loss chart responsive geometry (regression)', () => {
           card: card.scrollWidth - card.clientWidth,
           scrolls: wrap.scrollWidth > wrap.clientWidth,
           compact: svg.classList.contains('loss-chart-compact'),
+          compactExpected: wrap.clientWidth < 600,
           textPx: parseFloat(getComputedStyle(svg.querySelector('.chart-tick')).fontSize) * scale,
           bars: svg.querySelectorAll('[data-testid^="loss-bar-"]').length,
         };
@@ -262,7 +271,7 @@ test.describe('loss chart responsive geometry (regression)', () => {
       expect(m.doc, 'document overflow').toBeLessThanOrEqual(0);
       expect(m.card, 'chart card overflow').toBeLessThanOrEqual(0);
       expect(m.scrolls, 'chart scrolls sideways').toBe(false);
-      expect(m.compact).toBe(true);
+      expect(m.compact).toBe(m.compactExpected);
       expect(m.textPx).toBeGreaterThanOrEqual(12);
       expect(m.bars).toBe(20);
       // A vertical line has a zero-width box (Playwright calls it hidden), so check its geometry:
@@ -278,7 +287,9 @@ test.describe('loss chart responsive geometry (regression)', () => {
       expect(marker.x).toBeLessThanOrEqual(marker.width);
       await expect(page.locator('.loss-chart .chart-marker-label')).toContainText('VaR 95% · 124.10 EUR');
       await expect(page.locator('.loss-chart .chart-bar-tail')).not.toHaveCount(0);
-      await expect(page.locator('[data-testid="loss-distribution"] .legend')).toContainText('(tail)');
+      await expect(page.locator('[data-testid="loss-distribution"] .legend')).toContainText(
+        'Bucket containing the VaR marker and buckets beyond it',
+      );
     });
   }
 
@@ -286,10 +297,10 @@ test.describe('loss chart responsive geometry (regression)', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await loaded(page);
     const viewBox = () => page.getByTestId('loss-chart').getAttribute('viewBox');
-    expect(await viewBox()).toBe('0 0 640 320');
+    expect(await viewBox()).toBe('0 0 640 360');
     for (const [width, compact] of [
       [390, true],
-      [761, true],
+      [761, false],
       [1440, false],
       [360, true],
       [1440, false],
@@ -303,7 +314,7 @@ test.describe('loss chart responsive geometry (regression)', () => {
       expect(m.scrolls, `chart scrolls at ${String(width)} px`).toBe(false);
       expect(m.bars).toBe(20);
     }
-    expect(await viewBox()).toBe('0 0 640 320');
+    expect(await viewBox()).toBe('0 0 640 360');
   });
 });
 

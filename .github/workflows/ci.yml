@@ -196,6 +196,6 @@ jobs:
       - name: Record the static replay
         run: npm run export:replay
       - name: Install Chromium for Playwright
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Browser tests
         run: npm run test:e2e

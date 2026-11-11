@@ -19,10 +19,11 @@ afterEach(() => {
   for (const r of mounted.splice(0)) r.unmount();
 });
 
-async function show(view = multiCurrencyView()): Promise<Rendered> {
+async function show(view = multiCurrencyView(), kind: 'LIVE' | 'REPLAY' = 'LIVE'): Promise<Rendered> {
   const r = await render(
     <App
       source={memorySource({
+        kind,
         index: () => Promise.resolve({ ok: true, value: demoIndex() }),
         view: () => Promise.resolve({ ok: true, value: view }),
       })}
@@ -43,7 +44,9 @@ describe('panels and data mode (AT-DSH-01, AT-DSH-15)', () => {
     const { container } = await show();
     expect(container.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('124.10 EUR');
     const panel = text(container.querySelector('#base-var-title')?.closest('section') as HTMLElement);
-    expect(panel).toMatch(/1 day · 95% · Historical Simulation · as of 2026-11-06/);
+    expect(panel).toMatch(
+      /1 day · 95% · asset-price VaR · FX held fixed · Historical Simulation · as of 2026-11-06/,
+    );
     expect(panel).toMatch(/DEMO/);
     expect(panel).toMatch(/percentile-based one-day loss estimate/);
     expect(panel).toMatch(/not the maximum drawdown/);
@@ -69,6 +72,17 @@ describe('panels and data mode (AT-DSH-01, AT-DSH-15)', () => {
     expect(sentiment).toContain('-1 (bearish) to +1 (bullish)');
   });
 
+  it('explains replay freshness and the scope of Base VaR', async () => {
+    const { container } = await show(multiCurrencyView(), 'REPLAY');
+    expect(text(container)).toContain('Fresh at replay time');
+    expect(container.querySelector('[data-testid="summary"]')?.textContent).toContain(
+      'One-day asset-price VaR · FX held fixed',
+    );
+    expect([...container.querySelectorAll<HTMLElement>('.badge-current')].map(text)).not.toContain(
+      '●CURRENT',
+    );
+  });
+
   it('the top bar shows data mode, run mode, NAV, as-of, calculation time, and freshness', async () => {
     const { container } = await show();
     const bar = text(container.querySelector('.topbar') as HTMLElement);
@@ -90,11 +104,11 @@ describe('panel times, provenance labels, and DEMO badges (ui-guidelines 3 and 4
   it('every risk panel header states its parameters and its time', async () => {
     const { container } = await show();
     expect(panelText(container, 'base-var')).toContain(
-      '1 day · 95% · Historical Simulation · as of 2026-11-06',
+      '1 day · 95% · asset-price VaR · FX held fixed · Historical Simulation · as of 2026-11-06',
     );
     expect(panelText(container, 'adjusted-var')).toContain('1 day · 95% · as of 2026-11-06');
     expect(panelText(container, 'sentiment')).toContain(
-      'Sentiment index, -1 (bearish) to +1 (bullish) · as of 2026-11-06 16:00 UTC',
+      'Sentiment, -1 (bearish) to +1 (bullish) · as of 2026-11-06 16:00 UTC',
     );
     expect(panelText(container, 'filing')).toContain(
       'Filing risk score, 0 (low) to 1 (high) · as of \u2014 (not configured)',
@@ -250,8 +264,8 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
       expect(text(chart)).toContain('Allocation by position');
       expect(text(chart)).toContain('DEMO');
       // Legend rows: position number, ticker, and the exact backend percentage as text.
-      expect(text(row(container, 'DEMO-EU'))).toBe('1DEMO-EU40.20%');
-      expect(text(row(container, 'DEMO-UK'))).toBe('2DEMO-UK29.74%');
+      expect(text(row(container, 'DEMO-EU'))).toBe('1DEMO-EUEUR40.20%8994.29 EUR');
+      expect(text(row(container, 'DEMO-UK'))).toBe('2DEMO-UKGBP29.74%6655.13 EUR');
       // Segments use the same adapter widths, in backend order; the bar is decorative, and each
       // segment carries its legend number so shade is never the only cue.
       // Fintech redesign: the ring's arcs use the same adapter widths, in backend order; the
@@ -282,7 +296,8 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
       expect(chart.querySelector('.allocation-bars')).toBeNull(); // no repeated per-position bars
       // The unfilled remainder is explained in words, with no browser-computed figure.
       const note = text(chart.querySelector('[data-testid="allocation-remainder-note"]') as HTMLElement);
-      expect(note).toBe('Unfilled: not a listed position, for example cash (see Cash in the summary)');
+      expect(note).toContain('Cash balance');
+      expect(note).toContain('1000.00 EUR');
       expect(note).not.toMatch(/\d+\.\d+\s*%/);
       // The positions table states the same values.
       const table = text(
@@ -501,7 +516,8 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
     expect([...grid.querySelectorAll('h2')].map((h) => h.id)).toEqual(['loss-title', 'allocation-heading']);
     expect(titles.indexOf('allocation-heading')).toBe(titles.indexOf('loss-title') + 1);
     expect(titles.indexOf('base-var-title')).toBeGreaterThan(titles.indexOf('allocation-heading'));
-    expect(titles.indexOf('positions-title')).toBeGreaterThan(titles.indexOf('filing-title'));
+    expect(titles.indexOf('positions-title')).toBeLessThan(titles.indexOf('base-var-title'));
+    expect(titles.indexOf('ccy-title')).toBeLessThan(titles.indexOf('positions-title'));
     // The loss distribution is the one navy chart surface.
     expect(section(container).classList.contains('theme-dark')).toBe(true);
   });
@@ -536,6 +552,8 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
     expect(svgText).toContain('VaR 95% · 6.55 EUR');
     const legend = text(section(container).querySelector('.legend') as HTMLElement);
     expect(legend).toContain('Scenario losses per bucket');
+    expect(legend).toContain('Bucket containing the VaR marker and buckets beyond it');
+    expect(text(section(container))).toContain('may include scenarios at or below it');
     expect(legend).toContain('VaR 95% (raw quantile)');
   });
 
@@ -549,7 +567,12 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
       '4.75 to 7 EUR (upper edge included): 3 scenarios',
     ]);
     // Plot 56..624 px, 4 slots of 142 px; heights from counts 3/2/2/3 over 240 px (frame 320 tall).
-    expect(bars.map((b) => b.getAttribute('height'))).toEqual(['240', '160', '160', '240']);
+    expect(bars.map((b) => b.getAttribute('height'))).toEqual([
+      '280',
+      '186.66666666666666',
+      '186.66666666666666',
+      '280',
+    ]);
     // Tail emphasis by the backend's integer bucket index: the marker's bucket (index 3) and beyond.
     expect(bars.map((b) => b.getAttribute('class'))).toEqual([
       'chart-bar',
@@ -574,10 +597,10 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
       ['4', '4.75', '7', 'included', '3', 'VaR 95% at 6.55'],
     ]);
     const summary = text(container.querySelector('[data-testid="loss-summary"]') as HTMLElement);
-    expect(summary).toContain('10 daily scenarios from returns ending 2026-10-23 to 2026-11-06 (UTC dates)');
+    expect(summary).toContain('10 scenarios from returns ending 2026-10-23 to 2026-11-06 (UTC dates)');
     expect(summary).toContain('in 4 buckets of 2.25 EUR.');
     expect(summary).toContain('VaR 95% marker at 6.55 EUR.'); // backend display text
-    expect(summary).toContain('Scenarios with a larger loss than the marker: 1.');
+    expect(summary).toContain('1 of 10 scenarios exceeded the VaR marker.');
     // The exact, unrounded values sit in the disclosure, in a focusable scroll region.
     const exact = container.querySelector('[data-testid="loss-exact"]') as HTMLElement;
     expect(exact.closest('details')?.getAttribute('data-testid')).toBe('loss-table-details');
@@ -713,9 +736,13 @@ describe('S5 final polish', () => {
   it('sections follow positions, loss distribution, currency exposure, then FX rates, each full width', async () => {
     const { container } = await show();
     const order = [...container.querySelectorAll('main section h2')].map((h) => h.id);
-    expect(order.slice(order.indexOf('positions-title'))).toEqual([
-      'positions-title',
+    expect(order.slice(order.indexOf('ccy-title'))).toEqual([
       'ccy-title',
+      'positions-title',
+      'base-var-title',
+      'adjusted-var-title',
+      'sentiment-title',
+      'filing-title',
       'fx-title',
     ]);
     // Visual review: at half width the exact FX rates wrapped into unreadable columns.
@@ -735,7 +762,7 @@ describe('S5 final polish', () => {
   });
 
   it('the stylesheet keeps hierarchy in tokens and collapses the paired row on narrow screens', () => {
-    expect(css).toMatch(/--size-metric-secondary: 20px/);
+    expect(css).toMatch(/--size-metric-secondary: 22px/);
     expect(css).toMatch(/\.panel-primary \{[^}]*var\(--color-raised\)[^}]*var\(--color-border-strong\)/);
     expect(css).toMatch(/@media \(max-width: 760px\) \{\s*\.panels,\s*\.sections,/);
   });
@@ -807,9 +834,10 @@ describe('institutional redesign (presentation only)', () => {
     const labels = [...container.querySelectorAll('main > .eyebrow')].map((e) => [e.tagName, e.textContent]);
     expect(labels).toEqual([
       ['P', 'Risk visualisation'],
-      ['P', 'Risk signals'],
+      ['P', 'Currency exposure'],
       ['P', 'Portfolio'],
-      ['P', 'Currency and FX'],
+      ['P', 'Risk signals'],
+      ['P', 'FX provenance'],
     ]);
     // Each label sits directly before its group.
     const next = (label: string) =>
@@ -818,7 +846,7 @@ describe('institutional redesign (presentation only)', () => {
     expect(next('Risk visualisation')?.getAttribute('data-testid')).toBe('viz-grid');
     expect(next('Risk signals')?.classList.contains('panels')).toBe(true);
     expect(next('Portfolio')?.getAttribute('aria-labelledby')).toBe('positions-title');
-    expect(next('Currency and FX')?.getAttribute('aria-labelledby')).toBe('ccy-title');
+    expect(next('Currency exposure')?.getAttribute('aria-labelledby')).toBe('ccy-title');
   });
 
   it('allocation shades: dark position numbers reach 4.5:1 on every shade; shades reach 3:1 on panels', () => {
@@ -851,10 +879,7 @@ describe('institutional redesign (presentation only)', () => {
     expect(css).toMatch(/\.section,\s*\.panel:not\(\.panel-primary\) \{[^}]*var\(--color-border-subtle\)/);
     expect(css).toMatch(/\.summary-primary \+ \.summary-figure:not\(\.summary-primary\) \{[^}]*border-left/);
     // Teal stays interaction-only: no accent in the redesign block's data or surface rules.
-    const block = css.slice(
-      css.indexOf('Institutional redesign.'),
-      css.indexOf('Fintech redesign (ui-guidelines'),
-    );
+    const block = css.slice(css.indexOf('Institutional redesign.'), css.indexOf('Quantitative workspace:'));
     expect(block).not.toMatch(/--color-accent/);
   });
 });
@@ -891,18 +916,18 @@ describe('loss distribution layout (final refinement)', () => {
     expect(container.querySelectorAll('[aria-describedby="loss-exact-hint"]')).toHaveLength(1);
   });
 
-  it('the stylesheet: the loss card is one column; the visualisation grid is 2:1 and collapses at 1100 px', () => {
+  it('the stylesheet: the loss card is one column; the visualisation grid is 2:1 and collapses at 1200 px', () => {
     expect(css).toMatch(/\.loss-layout \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\);/);
     expect(css).not.toMatch(/minmax\(600px, 800px\) minmax\(16rem, 1fr\)/);
     expect(css).toMatch(
       /\.viz-grid \{\s*display: grid;\s*grid-template-columns: minmax\(0, 2fr\) minmax\(300px, 1fr\);/,
     );
     expect(css).toMatch(
-      /@media \(max-width: 1100px\) \{\s*\.viz-grid \{\s*grid-template-columns: minmax\(0, 1fr\);/,
+      /@media \(max-width: 1200px\) \{[\s\S]*?\.viz-grid \{\s*grid-template-columns: minmax\(0, 1fr\);/,
     );
   });
 
-  it('light theme with a navy scope: text tokens reach 4.5:1 on every navy surface too', () => {
+  it('dark workspace and chart scope: text tokens reach 4.5:1 on every navy surface too', () => {
     const scope = css.slice(css.indexOf('.theme-dark {'), css.indexOf('}', css.indexOf('.theme-dark {')));
     const hex = (name: string): string => {
       const m = new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i').exec(scope);
@@ -960,7 +985,9 @@ describe('sidebar navigation (fintech refinement)', () => {
     expect(nav.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('the stylesheet hides the section links on phones, where the sidebar is a compact header', () => {
-    expect(css).toMatch(/@media \(max-width: 760px\) \{[\s\S]*?\.sidebar-nav \{\s*display: none;/);
+  it('the stylesheet keeps section navigation accessible in the compact header', () => {
+    expect(css).toMatch(
+      /@media \(max-width: 900px\) \{[\s\S]*?\.sidebar-nav ul \{\s*display: flex;\s*flex-wrap: wrap;/,
+    );
   });
 });

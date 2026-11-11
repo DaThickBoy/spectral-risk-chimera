@@ -31,7 +31,7 @@ describe('Pages workflow', () => {
       'run: npm test',
       'run: npm run build',
       'run: npm run export:replay',
-      'run: npx playwright install --with-deps chromium',
+      'run: npx playwright install chromium',
       'run: npm run test:e2e',
       'uses: actions/configure-pages@',
       'uses: actions/upload-pages-artifact@',
@@ -82,6 +82,7 @@ describe('Pages workflow', () => {
         '- name: Install pinned gitleaks',
         'test -s dist/web/index.html',
         'test -s dist/web/replay/manifest.json',
+        'test -s dist/web/THIRD_PARTY_NOTICES.txt',
         SCAN,
         'uses: actions/configure-pages@',
         'uses: actions/upload-pages-artifact@',
@@ -144,7 +145,7 @@ describe('CI browser-test job', () => {
       'run: npm ci',
       'run: npm run build',
       'run: npm run export:replay',
-      'run: npx playwright install --with-deps chromium',
+      'run: npx playwright install chromium',
       'run: npm run test:e2e',
     ];
     let last = -1;

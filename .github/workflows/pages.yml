@@ -59,7 +59,7 @@ jobs:
       - name: Record the static replay
         run: npm run export:replay
       - name: Install Chromium for Playwright
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Browser tests against the replay under the Pages subpath
         run: npm run test:e2e
       - name: Install pinned gitleaks
@@ -81,6 +81,7 @@ jobs:
           # The scan must never pass because the bundle is missing.
           test -s dist/web/index.html
           test -s dist/web/replay/manifest.json
+          test -s dist/web/THIRD_PARTY_NOTICES.txt
           "${RUNNER_TEMP}/gitleaks" dir dist/web --config .gitleaks-bundle.toml --redact --no-banner --exit-code 1
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

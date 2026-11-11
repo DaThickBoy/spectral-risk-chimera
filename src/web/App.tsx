@@ -1,3 +1,4 @@
+import { ReplayContext } from './components/Badge.tsx';
 // Dashboard shell (tasks 17.2, 17.3): loads the portfolio list and one portfolio view through the
 // injected data source (live backend or recorded replay), and shows loading, error, and data
 // states. Reload is manual: there is no polling and no background retrieval.
@@ -180,7 +181,7 @@ export function App({
       />
     );
 
-  return (
+  const dashboard = (
     <LiveContext.Provider value={live}>
       <div className="app">
         <a className="skip-link" href="#main">
@@ -240,6 +241,10 @@ export function App({
                   <AllocationChart data={data} />
                 </section>
               </div>
+              <p className="eyebrow">Currency exposure</p>
+              <CurrencyExposureSection data={data} />
+              <p className="eyebrow">Portfolio</p>
+              <PositionsSection data={data} />
               <p className="eyebrow">Risk signals</p>
               {tourAt('panels')}
               <div className="panels">
@@ -248,11 +253,7 @@ export function App({
                 <SentimentPanel data={data} />
                 <FilingPanel data={data} />
               </div>
-              <p className="eyebrow">Portfolio</p>
-              <PositionsSection data={data} />
-              <p className="eyebrow">Currency and FX</p>
-              {/* Full width: at half width the exact FX rates wrap into unreadable columns. */}
-              <CurrencyExposureSection data={data} />
+              <p className="eyebrow">FX provenance</p>
               <FxSection data={data} />
             </>
           ) : null}
@@ -260,4 +261,5 @@ export function App({
       </div>
     </LiveContext.Provider>
   );
+  return <ReplayContext value={source.kind === 'REPLAY'}>{dashboard}</ReplayContext>;
 }
