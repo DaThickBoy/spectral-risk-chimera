@@ -145,7 +145,7 @@ describe('CI browser-test job', () => {
       'run: npm ci',
       'run: npm run build',
       'run: npm run export:replay',
-      'run: npx playwright install --with-deps chromium',
+      'run: npx playwright install chromium',
       'run: npm run test:e2e',
     ];
     let last = -1;
