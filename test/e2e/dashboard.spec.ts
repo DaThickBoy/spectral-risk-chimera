@@ -55,6 +55,51 @@ interface RecordedView {
 const panel = (page: Page, title: string) =>
   page.locator('section.panel', { has: page.getByRole('heading', { name: title }) });
 
+test.describe('dark quantitative workspace', () => {
+  for (const portfolio of ['demo-eur-usd-gbp', 'demo-eur-only']) {
+    for (const width of [1440, 1024, 761, 390, 320]) {
+      test(`${portfolio} at ${String(width)} px: readable figures, navigation, and honest risk labels`, async ({
+        page,
+      }) => {
+        const observed = watch(page);
+        await page.setViewportSize({ width, height: 1000 });
+        await page.goto(`${BASE}?portfolio=${portfolio}`);
+        await expect(page.getByTestId('summary-nav')).toHaveText(
+          portfolio === 'demo-eur-only' ? '14025.44 EUR' : '22375.74 EUR',
+        );
+        await expect(page.getByTestId('summary')).toContainText('One-day asset-price VaR · FX held fixed');
+        await expect(page.getByTestId('loss-summary')).toContainText(
+          '13 of 250 scenarios exceeded the VaR marker.',
+        );
+        await expect(page.getByTestId('loss-summary')).toContainText(
+          'The orange bucket containing the marker may include scenarios at or below it.',
+        );
+        await expect(page.getByTestId('allocation-remainder-note')).toContainText(
+          'Cash balance: 1000.00 EUR',
+        );
+        await expect(panel(page, 'Market Sentiment')).toContainText('DEMO OBSERVATION');
+        await expect(panel(page, 'Market Sentiment')).toContainText(
+          'Demo observations are synthetic and do not influence risk calculations.',
+        );
+        await expect(page.getByRole('navigation', { name: 'Dashboard sections' })).toBeVisible();
+        const metrics = (await page.evaluate(`(() => ({
+          overflow: document.documentElement.scrollWidth - innerWidth,
+          navSize: parseFloat(getComputedStyle(document.querySelector('[data-testid="summary-nav"]')).fontSize),
+          varSize: parseFloat(getComputedStyle(document.querySelector('[data-testid="summary-base-var"]')).fontSize),
+          titleSize: parseFloat(getComputedStyle(document.querySelector('.page-title')).fontSize)
+        }))()`)) as { overflow: number; navSize: number; varSize: number; titleSize: number };
+        expect(metrics.overflow).toBeLessThanOrEqual(0);
+        expect(metrics.navSize).toBeGreaterThanOrEqual(30);
+        expect(metrics.varSize).toBeGreaterThanOrEqual(28);
+        expect(metrics.titleSize).toBeGreaterThanOrEqual(30);
+        await page.getByRole('link', { name: 'Currency and FX', exact: true }).click();
+        await expect(page).toHaveURL(/#ccy-title$/);
+        expectClean(observed);
+      });
+    }
+  }
+});
+
 test.describe('recorded replay under the GitHub Pages subpath', () => {
   test('loads the multi-currency EUR portfolio with its recorded values and labels', async ({
     page,
@@ -72,7 +117,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     // S1: NAV and freshness are in the headline summary, directly below the top bar.
     const summary = page.getByTestId('summary');
     await expect(summary).toContainText('22375.74 EUR');
-    await expect(summary).toContainText('CURRENT');
+    await expect(summary).toContainText('Fresh at replay time');
     await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
     await expect(page.locator('.replay-note')).toContainText('Recorded DEMO replay');
     await expect(page.locator('.demo-banner')).toContainText('DEMO DATA');
@@ -84,7 +129,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
       'SEC Filing Risk',
     ]);
     await expect(panel(page, 'Base VaR')).toContainText(
-      '1 day · 95% · Historical Simulation · as of 2026-11-06',
+      '1 day · 95% · asset-price VaR · FX held fixed · Historical Simulation · as of 2026-11-06',
     );
     // Every risk panel header states its time (ui-guidelines 3); NAV and overview carry DEMO.
     await expect(panel(page, 'Sentiment-Adjusted VaR')).toContainText('1 day · 95% · as of 2026-11-06');
@@ -152,10 +197,10 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
       await expect(rows.nth(19)).toContainText(`VaR 95% at ${raw}`);
       await expect(panel(page, 'Base VaR')).toContainText(raw);
       await expect(page.getByTestId('loss-summary')).toContainText(
-        '250 daily scenarios from returns ending 2025-11-24 to 2026-11-06 (UTC dates), in 20 buckets',
+        '250 scenarios from returns ending 2025-11-24 to 2026-11-06 (UTC dates), in 20 buckets',
       );
       await expect(page.getByTestId('loss-summary')).toContainText(
-        'Scenarios with a larger loss than the marker: 13.',
+        '13 of 250 scenarios exceeded the VaR marker.',
       );
     }
   });
@@ -188,7 +233,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
       for (const [ticker, value] of rows) {
         const row = page.getByTestId(`sentiment-${ticker}`);
         await expect(row).toContainText(`${ticker} ${value}`);
-        await expect(row).toContainText('CURRENT');
+        await expect(row).toContainText('Fresh at replay time');
         await expect(row).toContainText('DEMO');
         await expect(row).toContainText(
           'latest observation, not an aggregated index · observed 2026-11-06 15:55 UTC',
@@ -375,7 +420,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
         // Fintech redesign: on the phone NAV and Base VaR are separate full-width KPI cards,
         // stacked, each with its own card border.
         expect(m.sameRow).toBe(false);
-        expect(m.divider).toBe('solid');
+        expect(m.divider).toBe('none');
       }
     });
   }

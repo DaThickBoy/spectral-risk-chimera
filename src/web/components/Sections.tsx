@@ -4,6 +4,7 @@
 import type { ReactElement } from 'react';
 import type { DashboardViewResponse } from '../../shared/apiContracts/index.js';
 import { MISSING, codeLabel, percentText, utcText, withUnit } from '../format.js';
+import { allocationBars } from '../chartAdapter.js';
 import { ExposureChart } from './ExposureChart.tsx';
 import { Help } from './Help.tsx';
 import { Badge, toneOf } from './Badge.tsx';
@@ -14,7 +15,7 @@ export function CurrencyExposureSection({ data }: { readonly data: View }): Reac
   const currency = data.display.currency;
   const text = new Map(data.display.currencyExposure.map((entry) => [entry.currency, entry.marketValueBase]));
   return (
-    <section className="section" aria-labelledby="ccy-title">
+    <section className="section currency-section" aria-labelledby="ccy-title">
       <h2 id="ccy-title">Currency exposure</h2>
       <p className="badges" data-testid="ccy-badges">
         {data.dataMode === 'DEMO' ? (
@@ -176,6 +177,7 @@ function FxAttributionNotes({ data }: { readonly data: View }): ReactElement | n
 export function PositionsSection({ data }: { readonly data: View }): ReactElement {
   const currency = data.display.currency;
   const baseText = new Map(data.display.assets.map((a) => [a.ticker, a.marketValueBase]));
+  const bars = new Map(allocationBars(data.view.assets).map((bar) => [bar.ticker, bar]));
   return (
     <section className="section" aria-labelledby="positions-title">
       <h2 id="positions-title">Positions and allocation</h2>
@@ -209,11 +211,23 @@ export function PositionsSection({ data }: { readonly data: View }): ReactElemen
             {data.view.assets.map((asset) => (
               <tr key={asset.ticker}>
                 <th scope="row">{asset.ticker}</th>
-                <td>{asset.currency}</td>
+                <td>
+                  <span className="currency-code">{asset.currency}</span>
+                </td>
                 <td className="num">{asset.signedQuantity}</td>
                 <td className="num">{withUnit(asset.marketPrice, asset.currency)}</td>
                 <td className="num">{withUnit(baseText.get(asset.ticker) ?? null, currency)}</td>
-                <td className="num">{percentText(asset.allocationPct)}</td>
+                <td className="num position-allocation">
+                  {percentText(asset.allocationPct)}
+                  <div className="allocation-track" aria-hidden="true">
+                    {bars.get(asset.ticker)?.widthPct == null ? null : (
+                      <span
+                        className="allocation-bar"
+                        style={{ width: `${String(bars.get(asset.ticker)?.widthPct)}%` }}
+                      />
+                    )}
+                  </div>
+                </td>
                 <td>
                   <Badge tone={toneOf(asset.valuationStatus)} label={codeLabel(asset.valuationStatus)} />
                   {asset.priceProvenance?.sourceKind === 'DEMO' ? <Badge tone="demo" label="DEMO" /> : null}

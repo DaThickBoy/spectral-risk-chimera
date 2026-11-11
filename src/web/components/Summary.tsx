@@ -73,6 +73,7 @@ export function SummarySection({ data }: { readonly data: View }): ReactElement 
             Base VaR · 1 day · {confidencePct(data.view.confidence)}{' '}
             <Badge tone={toneOf(base.validity)} label={codeLabel(base.validity)} />
             <Help term="baseVar" />
+            <span className="muted-block">One-day asset-price VaR · FX held fixed</span>
           </dt>
           <dd className="num" data-testid="summary-base-var">
             {withUnit(data.display.baseVaR, currency)}

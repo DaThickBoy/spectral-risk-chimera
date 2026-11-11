@@ -49,7 +49,7 @@ export function BaseVarPanel({ data }: { readonly data: View }): ReactElement {
     <Panel
       id="base-var"
       title="Base VaR"
-      params={`1 day · ${confidencePct(data.view.confidence)} · Historical Simulation · as of ${data.freshness.asOfDate ?? MISSING}`}
+      params={`1 day · ${confidencePct(data.view.confidence)} · asset-price VaR · FX held fixed · Historical Simulation · as of ${data.freshness.asOfDate ?? MISSING}`}
       help="confidence"
       tier="primary"
     >
@@ -181,7 +181,7 @@ function SentimentRow(props: { readonly ticker: string; readonly fromView: Senti
     <li data-testid={`sentiment-${props.ticker}`}>
       <span className="ticker">{props.ticker}</span> <span className="num">{sentiment.value ?? MISSING}</span>{' '}
       <Badge tone={toneOf(sentiment.status)} label={sentiment.status} />
-      {sentiment.sourceKind === 'DEMO' ? <Badge tone="demo" label="DEMO" /> : null}
+      {sentiment.sourceKind === 'DEMO' ? <Badge tone="demo" label="DEMO OBSERVATION" /> : null}
       {basis === undefined ? null : (
         <span className="muted-block">
           {basis} · observed {utcText(sentiment.observedAt)}
@@ -196,7 +196,7 @@ export function SentimentPanel({ data }: { readonly data: View }): ReactElement 
     <Panel
       id="sentiment"
       title="Market Sentiment"
-      params={`Sentiment index, -1 (bearish) to +1 (bullish) · as of ${utcText(data.generatedAt)}`}
+      params={`Sentiment, -1 (bearish) to +1 (bullish) · as of ${utcText(data.generatedAt)}`}
     >
       <ul className="plain-list">
         {data.view.assets.map((asset) => (
@@ -204,7 +204,8 @@ export function SentimentPanel({ data }: { readonly data: View }): ReactElement 
         ))}
       </ul>
       <p className="caption">
-        Scale: -1 bearish to +1 bullish. Shown separately from filing risk; never combined.
+        Scale: -1 bearish to +1 bullish. Demo observations are synthetic and do not influence risk
+        calculations. Shown separately from filing risk; never combined.
       </p>
     </Panel>
   );

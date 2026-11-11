@@ -82,6 +82,7 @@ describe('Pages workflow', () => {
         '- name: Install pinned gitleaks',
         'test -s dist/web/index.html',
         'test -s dist/web/replay/manifest.json',
+        'test -s dist/web/THIRD_PARTY_NOTICES.txt',
         SCAN,
         'uses: actions/configure-pages@',
         'uses: actions/upload-pages-artifact@',

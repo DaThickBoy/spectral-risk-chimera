@@ -1,5 +1,7 @@
 // Status badges (ui-guidelines 4): every state has a text label; colour is never the only signal.
-import type { ReactElement } from 'react';
+import { createContext, useContext, type ReactElement } from 'react';
+
+export const ReplayContext = createContext(false);
 
 export type BadgeTone = 'current' | 'demo' | 'warning' | 'critical' | 'unavailable' | 'neutral' | 'info';
 
@@ -18,12 +20,14 @@ export function Badge(props: {
   readonly label: string;
   readonly title?: string;
 }): ReactElement {
+  const replay = useContext(ReplayContext);
+  const label = replay && props.label === 'CURRENT' ? 'Fresh at replay time' : props.label;
   return (
     <span className={`badge badge-${props.tone}`} title={props.title}>
       <span aria-hidden="true" className="badge-icon">
         {ICON[props.tone]}
       </span>
-      {props.label}
+      {label}
     </span>
   );
 }

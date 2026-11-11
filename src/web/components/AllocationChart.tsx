@@ -5,7 +5,7 @@
 import type { ReactElement } from 'react';
 import type { DashboardViewResponse } from '../../shared/apiContracts/index.js';
 import { allocationArcs, allocationBars } from '../chartAdapter.js';
-import { codeLabel, percentText } from '../format.js';
+import { codeLabel, percentText, withUnit } from '../format.js';
 import { Badge, toneOf } from './Badge.tsx';
 
 type View = DashboardViewResponse;
@@ -17,6 +17,7 @@ const RING = { center: 110, radius: 84, labelRadius: 84 } as const;
 
 export function AllocationChart({ data }: { readonly data: View }): ReactElement {
   const assets = data.view.assets;
+  const values = new Map(data.display.assets.map((asset) => [asset.ticker, asset.marketValueBase]));
   const bars = allocationBars(assets);
   const none = bars.every((bar) => bar.notPlotted === 'UNAVAILABLE');
   // Fintech redesign: when every position is plotted on the 0–100 % axis, show the allocation
@@ -100,15 +101,26 @@ export function AllocationChart({ data }: { readonly data: View }): ReactElement
                   <span className={`swatch seq-${String((i % SEQUENCE) + 1)}`} aria-hidden="true">
                     {String(i + 1)}
                   </span>
-                  <span className="allocation-ticker">{bar.ticker}</span>
-                  <span className="allocation-value num">{percentText(asset.allocationPct)}</span>
+                  <span className="allocation-ticker holding-identity">
+                    {bar.ticker}
+                    <span className="muted-block">{asset.currency}</span>
+                  </span>
+                  <span className="allocation-value num holding-values">
+                    {percentText(asset.allocationPct)}
+                    <span className="muted-block">
+                      {withUnit(values.get(asset.ticker) ?? null, data.display.currency)}
+                    </span>
+                  </span>
                 </li>
               );
             })}
             {/* Described, never computed: the browser does not derive the remainder. */}
             <li className="composition-item composition-unfilled" data-testid="allocation-remainder-note">
               <span className="swatch swatch-unfilled" aria-hidden="true" />
-              <span>Unfilled: not a listed position, for example cash (see Cash in the summary)</span>
+              <span>
+                Cash balance: {withUnit(data.display.exposure.cash, data.display.currency)} (shown by the
+                uncoloured track for eligible allocations)
+              </span>
             </li>
           </ul>
         </>

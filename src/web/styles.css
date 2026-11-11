@@ -1,74 +1,56 @@
-/*
- * Dashboard styles (task 17.2; ui-guidelines.md §1). Light theme (D1): a light canvas with white
- * cards in `:root`, and a `.theme-dark` scope that re-declares the same tokens for the navy
- * sidebar and chart surfaces. Every colour, size, and spacing value is a design token. 1px
- * borders, one teal accent for interaction, blue for information only, amber for warnings only,
- * red for errors and adverse risk. No decorative animation; transitions are disabled under
- * prefers-reduced-motion.
- */
+/* Dark analytical workspace. Financial labels use backend text; chart geometry stays in the existing adapter. */
 :root {
-  /* Fintech redesign (ui-guidelines §1): light canvas, white elevated cards. The navy sidebar
-     and chart surfaces re-declare these tokens in `.theme-dark` below. */
-  --color-bg: #f3f5f9;
-  --color-panel: #ffffff;
-  --color-panel-navy: #ffffff; /* headline surface (the summary); navy inside .theme-dark */
-  --color-raised: #f1f4f9;
-  --color-border: #e2e7ef;
-  --color-border-strong: #c9d2df;
-  --color-border-subtle: #e9edf3;
-  --color-row-hover: #f6f8fb;
-  --shadow-card: 0 1px 2px rgb(16 24 40 / 6%), 0 4px 16px rgb(16 24 40 / 5%);
-  --radius-card: 12px;
-  /* Text */
-  --color-text: #111a2e;
-  --color-text-secondary: #4b5567;
-  --color-text-muted: #667085;
-  /* Interaction: the one accent (focus, hover, selected); darker teal for light surfaces */
-  --color-accent: #0f766e;
-  /* Information: provenance (DEMO) and informational badges; never interaction, never risk */
-  --color-info: #1d4ed8;
-  /* Semantic states (always with a text label) */
-  --color-positive: #15803d;
-  --color-negative: #c62828;
-  --color-warning: #b45309;
-  --color-high: #c2410c;
-  --color-critical: #be123c;
-  --color-critical-bg: #fde8ee;
-  /* Charts: data marks. Categorical shades are blue, green, and violet (never a status colour);
-     orange is reserved for the VaR marker and tail, always with a text label. */
-  --chart-bar: #2f62d6;
-  --chart-grid: #e5e9f0;
-  --chart-tail: #c2410c;
-  /* Categorical position shades: each at least 3:1 on white, with white numbers at 4.5:1. */
-  --chart-seq-1: #2f62d6;
-  --chart-seq-2: #12805c;
-  --chart-seq-3: #6b4fd0;
-  --chart-seq-4: #1e4aa8;
-  --chart-seq-5: #0b6347;
-  --chart-seq-6: #4f37a8;
-  --chart-seq-ink: #ffffff;
+  color-scheme: dark;
+  --color-bg: #090f1b;
+  --color-panel: #111c2e;
+  --color-panel-navy: #111c2e;
+  --color-raised: #19283d;
+  --color-border: #2b3d55;
+  --color-border-strong: #4b6585;
+  --color-border-subtle: #25354b;
+  --color-row-hover: #19283d;
+  --shadow-card: 0 8px 28px rgb(0 0 0 / 12%);
+  --radius-card: 16px;
+  --color-text: #f1f5fc;
+  --color-text-secondary: #b2c1d5;
+  --color-text-muted: #9bacc4;
+  --color-accent: #62d4e8;
+  --color-info: #a2c1ff;
+  --color-positive: #76dfb1;
+  --color-negative: #ff8e9c;
+  --color-warning: #ffc078;
+  --color-high: #ffb18d;
+  --color-critical: #ff9eb4;
+  --color-critical-bg: #392332;
+  --chart-bar: #76a3ff;
+  --chart-grid: #2b3d55;
+  --chart-tail: #ffb45e;
+  --chart-seq-1: #76a3ff;
+  --chart-seq-2: #65d1be;
+  --chart-seq-3: #b39af6;
+  --chart-seq-4: #7fc5f5;
+  --chart-seq-5: #b2c982;
+  --chart-seq-6: #e5a6c2;
+  --chart-seq-ink: #0a1426;
   --chart-axis: var(--color-text-muted);
-  --chart-marker: var(--color-text);
+  --chart-marker: #ffb45e;
   --chart-min-width: 600px;
-  /* The loss chart's viewBox is 640 wide; capping it bounds text scaling to 1.25x on desktop. */
   --chart-max-width: 800px;
-  /* Type */
   --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-num: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, monospace;
-  --size-body: 14px;
-  --size-table: 13px;
+  --font-num: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --size-body: 15px;
+  --size-table: 14px;
   --size-small: 13px;
-  --size-metric: 28px;
-  --size-metric-secondary: 20px;
-  --size-h2: 16px;
-  --size-label: 12px; /* uppercase field labels only, never data values */
-  /* Spacing */
+  --size-metric: 36px;
+  --size-metric-secondary: 22px;
+  --size-h2: 21px;
+  --size-label: 12px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 24px;
-  --radius: 4px;
+  --radius: 6px;
   --transition-fast: 150ms;
 }
 
@@ -95,6 +77,15 @@ h2 {
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+.site-footer {
+  padding: 12px 24px 24px;
+  text-align: center;
+}
+
+.site-footer a {
+  color: var(--color-text);
 }
 
 button,
@@ -1160,55 +1151,44 @@ thead th {
   margin-top: 0;
 }
 
-/* =============================================================================================
-   Fintech redesign (ui-guidelines §1, §3). Layout and surfaces only: no value is changed,
-   rounded, or computed here.
-   ============================================================================================= */
-
-/* Dark scope: the navy sidebar and chart surfaces re-declare the tokens, so every existing child
-   style (badges, disclosures, help, tables, focus ring) renders correctly on navy. */
+/* Quantitative workspace: overview, loss analysis, composition, and evidence. */
 .theme-dark {
-  --color-bg: #0a1426;
-  --color-panel: #0f1d38;
-  --color-panel-navy: #0f1d38;
-  --color-raised: #172a4d;
-  --color-border: #263b60;
-  --color-border-strong: #34507f;
-  --color-border-subtle: #1c3054;
-  --color-row-hover: #142546;
-  --color-text: #e8edf6;
-  --color-text-secondary: #a7b3c8;
-  --color-text-muted: #8492a9;
-  --color-accent: #2ec4b6;
-  --color-info: #8fb0ff;
-  --color-positive: #3ccf86;
-  --color-negative: #ff7b7b;
-  --color-warning: #f5a524;
-  --color-high: #ff8a5c;
-  --color-critical: #ff7a93;
-  --color-critical-bg: #3a1622;
-  --chart-bar: #6f9bff;
-  --chart-grid: #2a4068;
-  --chart-tail: #f59e42;
-  --chart-axis: #8492a9;
-  --chart-marker: #f59e42;
+  --color-bg: #090f1b;
+  --color-panel: #111c2e;
+  --color-panel-navy: #111c2e;
+  --color-raised: #19283d;
+  --color-border: #2b3d55;
+  --color-border-strong: #4b6585;
+  --color-border-subtle: #25354b;
+  --color-row-hover: #19283d;
+  --color-text: #f1f5fc;
+  --color-text-secondary: #b2c1d5;
+  --color-text-muted: #9bacc4;
+  --color-accent: #62d4e8;
+  --color-info: #a2c1ff;
+  --color-positive: #76dfb1;
+  --color-negative: #ff8e9c;
+  --color-warning: #ffc078;
+  --color-high: #ffb18d;
+  --color-critical: #ff9eb4;
+  --color-critical-bg: #392332;
+  --chart-bar: #76a3ff;
+  --chart-grid: #2b3d55;
+  --chart-tail: #ffb45e;
+  --chart-axis: #9bacc4;
+  --chart-marker: #ffb45e;
   color: var(--color-text);
 }
-
-/* Shell: navy sidebar on the left, the light workspace on the right. */
 .app {
-  max-width: none;
-  margin: 0;
+  max-width: 1920px;
+  margin: 0 auto;
   padding: 0;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
-  grid-template-areas:
-    'side head'
-    'side main';
+  grid-template-columns: 216px minmax(0, 1fr);
+  grid-template-areas: 'side head' 'side main';
   grid-template-rows: auto 1fr;
   min-height: 100vh;
 }
-
 .topbar {
   grid-area: side;
   position: sticky;
@@ -1218,394 +1198,684 @@ thead th {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: 24px;
   margin: 0;
-  padding: var(--space-5) var(--space-4);
-  background: var(--color-panel);
+  padding: 28px 18px;
+  background: var(--color-bg);
   border: 0;
+  border-right: 1px solid var(--color-border-subtle);
   border-radius: 0;
 }
-
 .brand {
   align-items: flex-start;
+  gap: 10px;
 }
-
 .brand-name {
-  font-size: 16px;
+  font-size: 20px;
+  line-height: 1.25;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.04em;
 }
-
+.brand-tag {
+  margin-top: 10px;
+  line-height: 1.6;
+  font-size: 12px;
+}
 .mark {
-  color: var(--color-info);
+  flex-shrink: 0;
+  color: var(--color-accent);
 }
-
 .topbar-facts {
+  order: 2;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 16px;
 }
-
 .topbar-facts dt {
-  font-size: var(--size-label);
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-
+.topbar-facts dd {
+  margin-top: 5px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.replay-note {
+  order: 3;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--color-text-muted);
+}
+.sidebar-nav {
+  order: 1;
+}
 .sidebar-nav ul {
   list-style: none;
   margin: 0;
-  padding: var(--space-3) 0 0;
-  border-top: 1px solid var(--color-border);
+  padding: 16px 0;
+  border-block: 1px solid var(--color-border);
   display: grid;
-  gap: var(--space-1);
+  gap: 4px;
 }
-
 .sidebar-nav a {
   display: block;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
+  padding: 10px 12px;
+  border-radius: 6px;
   color: var(--color-text-secondary);
   text-decoration: none;
+  font-size: 14px;
 }
-
 .sidebar-nav a:hover {
   color: var(--color-text);
   background: var(--color-raised);
 }
-
-/* Section headings reached from the sidebar keep a little space above them. */
-main h2[id] {
-  scroll-margin-top: var(--space-4);
+.sidebar-nav li:first-child a {
+  background: var(--color-raised);
+  color: var(--color-text);
+  border-left: 2px solid var(--color-accent);
 }
-
+main h2[id] {
+  scroll-margin-top: 24px;
+}
 .page-header {
   grid-area: head;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3) var(--space-5);
-  padding: var(--space-5) 32px var(--space-2);
+  gap: 20px;
+  padding: 30px 32px 24px;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
-
 .page-title {
   margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 34px;
+  line-height: 1.15;
+  font-weight: 650;
+  letter-spacing: -0.04em;
 }
-
 .page-subtitle {
-  margin: var(--space-1) 0 0;
+  margin: 8px 0 0;
   color: var(--color-text-secondary);
+  font-size: 13px;
 }
-
+.topbar-controls {
+  gap: 8px;
+}
+button,
+select {
+  min-height: 40px;
+}
 main {
   grid-area: main;
   min-width: 0;
-  padding: var(--space-2) 32px 40px;
+  padding: 24px 32px 48px;
 }
-
-/* Cards: white, elevated, rounded; a hairline border keeps them crisp on the light canvas. */
 .section,
 .panel,
 .summary {
-  background: var(--color-panel);
-  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
 }
-
-.panel-primary {
-  border-color: var(--color-border-strong);
-}
-
-/* The summary frames the KPI cards; the cards carry the elevation. */
 .summary {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  padding: 0;
+  padding: 24px;
+  background: linear-gradient(115deg, #16253b, #111c2e 70%);
+  border: 1px solid var(--color-border);
 }
-
+.summary h2 {
+  font-size: 17px;
+}
+.summary .badges {
+  margin-bottom: 24px;
+}
+.summary-times {
+  font-size: 13px;
+}
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  align-items: stretch; /* equal-height cards (the base .summary-figures rule aligns to the end) */
-  gap: var(--space-4);
-  margin: var(--space-3) 0;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.7fr) minmax(0, 1.2fr) minmax(0, 0.75fr);
+  align-items: stretch;
+  gap: 0;
+  margin: 0 0 24px;
 }
-
-/* A long reason badge wraps inside its KPI card or risk-signal card instead of overflowing it
-   (for example "AGGREGATION NOT APPROVED · OD-1" in a two-column card at tablet widths). */
-.kpi-note .badge,
-.panels .badge {
-  white-space: normal;
-}
-
-.kpi-grid > .summary-figure,
-.kpi-grid > .summary-primary + .summary-primary,
-.kpi-grid > .summary-primary + .summary-figure:not(.summary-primary) {
-  padding: var(--space-4) var(--space-5);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
-}
-
-/* Each card is a column: the label takes the free space, so every value sits on the same line
-   across the row even when a label wraps (badge and help button). */
 .kpi-grid > .summary-figure {
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  padding: 0 20px;
+  border-left: 1px solid var(--color-border);
 }
-
+.kpi-grid > .summary-figure:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+.kpi-grid > .summary-figure:last-child {
+  padding-right: 0;
+}
 .kpi-grid > .summary-figure dt {
+  font-size: 13px;
+  min-height: 64px;
   flex: 1 0 auto;
   align-content: flex-start;
-  font-size: var(--size-label);
-  letter-spacing: 0.02em;
 }
-
 .kpi-grid > .summary-figure dd {
-  margin-top: var(--space-2);
+  margin-top: 8px;
   font-size: 22px;
   font-weight: 600;
+  letter-spacing: -0.035em;
 }
-
-/* NAV is the primary figure, Base VaR the secondary headline figure. */
 .kpi-grid > .summary-primary dd {
-  font-size: 30px;
+  font-size: clamp(30px, 2.8vw, 40px);
 }
-
 .kpi-grid > .summary-primary + .summary-primary dd {
-  font-size: 26px;
+  font-size: clamp(28px, 2.4vw, 34px);
+  color: var(--color-warning);
 }
-
 .kpi-grid > .summary-figure .kpi-note {
-  margin-top: var(--space-2);
-  font-size: var(--size-label);
+  min-height: 0;
+  margin-top: 10px;
+  font-size: 12px;
+  letter-spacing: 0;
   font-weight: 400;
-  color: var(--color-text-secondary);
 }
-
-/* A KPI with an open help panel spans the row (the help explanation stays below its label). */
+.kpi-note .badge,
+.panels .badge,
+.kpi-var .badge {
+  white-space: normal;
+}
 .kpi-grid > .summary-figure:has(.help-panel) {
   grid-column: 1 / -1;
+  padding: 0;
+  border: 0;
 }
-
+.kpi-grid > .summary-figure:has(.help-panel) dt {
+  min-height: 0;
+}
 .exposure-strip {
-  padding: var(--space-3) var(--space-5);
-  background: var(--color-panel);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
-  gap: var(--space-3) 40px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 18px;
+  gap: 16px 36px;
 }
-
-.exposure-strip .summary-figure + .summary-figure,
-.exposure-strip > .summary-primary + .summary-figure:not(.summary-primary) {
+.exposure-strip .summary-figure + .summary-figure {
   padding-left: 0;
   border-left: 0;
 }
-
-/* Main visualisations: the loss distribution beside the allocation ring. */
+.exposure-strip .summary-figure dd {
+  font-size: 17px;
+  font-weight: 500;
+}
+.demo-banner {
+  border: 0;
+  border-left: 2px solid var(--color-info);
+  border-radius: 0;
+  padding: 0 12px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  margin: 16px 0 28px;
+}
+.eyebrow {
+  margin: 32px 0 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.12em;
+}
 .viz-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  gap: 20px;
+  margin-bottom: 24px;
 }
-
 .viz-grid > .section {
   margin-bottom: 0;
 }
-
 .chart-surface {
+  padding: 24px;
+  border: 1px solid var(--color-border);
   background: var(--color-panel);
-  border: 0;
-  padding: var(--space-5);
 }
-
+.chart-surface h2 .muted-inline {
+  display: block;
+  margin-top: 8px;
+  line-height: 1.6;
+  font-weight: 400;
+}
+.chart-surface .badges {
+  margin-block: 12px 18px;
+}
 .chart-surface .loss-chart {
   max-width: none;
 }
-
-/* Narrow screens: the compact frame is drawn near 1:1, so no minimum width and no scrolling. */
 .loss-chart.loss-chart-compact {
   min-width: 0;
 }
-
+.chart-bar {
+  rx: 2px;
+}
 .chart-bar-tail {
   fill: var(--chart-tail);
 }
-
 .legend-tail {
   background: var(--chart-tail);
 }
-
 .chart-marker-label {
   fill: var(--chart-marker);
+  font-weight: 650;
 }
-
-/* Allocation ring. */
+.chart-tick,
+.chart-axis-label,
+.chart-marker-label {
+  font-size: 13px;
+}
+.legend {
+  gap: 8px 18px;
+  font-size: 12px;
+}
+.loss-side {
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+}
+.loss-side-label {
+  font-size: 13px;
+  color: var(--color-text);
+}
+.scenario-fraction {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--color-warning);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.loss-details {
+  padding-top: 4px;
+}
+.viz-allocation {
+  padding: 24px;
+}
 .donut {
   display: block;
-  width: min(100%, 240px);
+  width: min(100%, 280px);
   height: auto;
-  margin: var(--space-2) auto var(--space-4);
+  margin: 20px auto 24px;
 }
-
 .donut-track,
 .donut-arc {
   fill: none;
-  stroke-width: 30;
+  stroke-width: 24;
 }
-
 .donut-track {
-  stroke: var(--color-border);
+  stroke: var(--color-border-strong);
 }
-
 .donut-arc.seq-1 {
   stroke: var(--chart-seq-1);
 }
-
 .donut-arc.seq-2 {
   stroke: var(--chart-seq-2);
 }
-
 .donut-arc.seq-3 {
   stroke: var(--chart-seq-3);
 }
-
 .donut-arc.seq-4 {
   stroke: var(--chart-seq-4);
 }
-
 .donut-arc.seq-5 {
   stroke: var(--chart-seq-5);
 }
-
 .donut-arc.seq-6 {
   stroke: var(--chart-seq-6);
 }
-
 .donut-label {
   fill: var(--chart-seq-ink);
   font-family: var(--font-num);
   font-size: 13px;
   font-weight: 700;
 }
-
 .donut-center {
   fill: var(--color-text);
   font-family: var(--font-num);
-  font-size: 30px;
-  font-weight: 700;
+  font-size: 34px;
+  font-weight: 650;
 }
-
 .donut-center-label {
   fill: var(--color-text-secondary);
-  font-size: var(--size-label);
+  font-size: 12px;
 }
-
 .viz-allocation .composition-legend {
   grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
 }
-
-@media (max-width: 1100px) {
+.holding-identity {
+  display: block;
+}
+.holding-identity .muted-block {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 400;
+}
+.holding-values {
+  display: block;
+  text-align: right;
+}
+.holding-values .muted-block {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+.composition-unfilled {
+  border-top: 1px solid var(--color-border);
+  padding-top: 14px;
+  line-height: 1.6;
+  font-size: 13px;
+}
+.currency-section .allocation-bars {
+  gap: 20px;
+  margin: 24px 0;
+}
+.currency-section .allocation-track {
+  height: 14px;
+}
+.currency-section .allocation-ticker {
+  font-size: 16px;
+}
+.currency-section .allocation-value {
+  font-size: 19px;
+}
+.currency-section .table-wrap {
+  border-top: 1px solid var(--color-border);
+}
+.allocation-bar {
+  border-radius: 3px;
+}
+.allocation-row:nth-child(2) .allocation-bar {
+  background: var(--chart-seq-2);
+}
+.allocation-row:nth-child(3) .allocation-bar {
+  background: var(--chart-seq-3);
+}
+.bar-negative {
+  background: transparent !important;
+  border-width: 2px;
+}
+.position-allocation {
+  min-width: 90px;
+}
+.position-allocation .allocation-track {
+  margin-top: 8px;
+  height: 5px;
+}
+.position-allocation .allocation-bar {
+  background: var(--chart-bar);
+}
+.currency-code {
+  display: inline-block;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--color-border-strong);
+  padding: 3px 7px;
+  border-radius: 5px;
+}
+th,
+td {
+  padding: 14px 12px;
+}
+tbody th {
+  font-weight: 600;
+}
+.rate {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+}
+.panels {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.panel {
+  padding: 22px;
+}
+.panel-header {
+  border: 0;
+  margin-bottom: 18px;
+  padding-bottom: 0;
+}
+.panel h2 {
+  font-size: 18px;
+}
+.panel-primary {
+  border-top: 2px solid var(--chart-tail);
+}
+.panel-primary .metric {
+  color: var(--color-warning);
+}
+.plain-list li {
+  border-top: 1px solid var(--color-border);
+  padding: 14px 0;
+}
+.plain-list li .ticker {
+  font-weight: 600;
+}
+.plain-list li .num {
+  margin-left: auto;
+  font-size: 20px;
+}
+.plain-list li .muted-block {
+  flex-basis: 100%;
+}
+.badge {
+  padding: 2px 7px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.badge-current {
+  color: var(--color-positive);
+  border-color: var(--color-border);
+}
+.badge-demo {
+  border-style: solid;
+  background: #172640;
+}
+.tour-card {
+  max-width: 54rem;
+  padding: 20px 24px;
+}
+.tour-line {
+  font-size: 14px;
+}
+@media (max-width: 1200px) {
+  .app {
+    grid-template-columns: 184px minmax(0, 1fr);
+  }
+  .page-header {
+    padding: 24px;
+  }
+  main {
+    padding: 20px 24px 40px;
+  }
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 0;
+  }
+  .kpi-grid > .summary-figure:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
   .viz-grid {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-@media (max-width: 760px) {
-  .app {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'side'
-      'head'
-      'main';
-    grid-template-rows: auto auto 1fr;
+  .viz-allocation .allocation {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(0, 1.3fr);
+    align-items: center;
+    gap: 0 32px;
   }
-
-  .topbar {
-    position: static;
-    height: auto;
-    overflow: visible;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-  }
-
-  .topbar-facts {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  /* Compact header on phones: the section links are hidden (and so leave the Tab order). */
-  .sidebar-nav {
-    display: none;
-  }
-
-  .page-header {
-    padding: var(--space-4) var(--space-4) var(--space-2);
-  }
-
-  main {
-    padding: var(--space-2) var(--space-4) var(--space-5);
-  }
-
-  .kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-3);
-  }
-
-  .kpi-grid > .summary-primary {
+  .viz-allocation .allocation-title {
     grid-column: 1 / -1;
   }
-
-  .kpi-grid > .summary-figure,
-  .kpi-grid > .summary-primary + .summary-primary,
-  .kpi-grid > .summary-primary + .summary-figure:not(.summary-primary) {
-    padding: var(--space-3) var(--space-4);
-  }
-
-  .kpi-grid > .summary-figure dd {
-    font-size: 18px;
-  }
-
-  .kpi-grid > .summary-primary dd {
-    font-size: 26px;
-  }
-
-  .kpi-grid > .summary-primary + .summary-primary dd {
-    font-size: 22px;
-  }
-
-  .chart-surface {
-    padding: var(--space-4);
+  .donut {
+    margin: 16px auto;
   }
 }
-
-/* Responsive layout */
 @media (max-width: 1100px) {
   .panels {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'side' 'head' 'main';
+    grid-template-rows: auto auto 1fr;
+  }
+  .topbar {
+    position: static;
+    height: auto;
+    overflow: visible;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 24px;
+    gap: 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .brand-name {
+    font-size: 22px;
+  }
+  .brand-tag {
+    margin-top: 4px;
+  }
+  .topbar-facts {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin: 0;
+  }
+  .topbar-facts dt {
+    display: none;
+  }
+  .topbar-facts dd {
+    margin: 0;
+  }
+  .replay-note {
+    margin: 0;
+  }
+  .sidebar-nav {
+    order: 0;
+    min-width: 0;
+  }
+  .sidebar-nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    border-bottom: 0;
+    padding: 12px 0 0;
+  }
+  .sidebar-nav a {
+    padding: 8px;
+    font-size: 13px;
+  }
+  .sidebar-nav li:first-child a {
+    border-left: 0;
+  }
+}
 @media (max-width: 760px) {
   .panels,
   .sections,
   .facts-grid {
     grid-template-columns: minmax(0, 1fr);
   }
-
+  .page-header {
+    padding: 24px 16px 20px;
+  }
+  .page-title {
+    font-size: 30px;
+  }
+  main {
+    padding: 20px 16px 32px;
+  }
   .topbar {
-    grid-template-columns: 1fr;
+    padding: 18px 16px;
+  }
+  .topbar-controls {
+    width: 100%;
+  }
+  .topbar-controls select {
+    min-width: 0;
+    width: 100%;
+  }
+  .summary {
+    padding: 18px 16px;
+  }
+  .summary h2 .muted-inline {
+    display: block;
+    margin-top: 6px;
+  }
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 0;
+  }
+  .kpi-grid > .summary-primary {
+    grid-column: 1 / -1;
+    padding: 0;
+    border-left: 0;
+  }
+  .kpi-grid > .summary-figure:nth-child(3) {
+    padding: 0 10px 0 0;
+  }
+  .kpi-grid > .summary-figure:nth-child(4) {
+    padding: 0 0 0 10px;
+  }
+  .kpi-grid > .summary-figure dt {
+    min-height: 0;
+    margin-bottom: 8px;
+  }
+  .kpi-grid > .summary-figure dd {
+    margin: 0;
+    font-size: 20px;
+  }
+  .kpi-grid > .summary-primary dd {
+    font-size: clamp(30px, 8vw, 38px);
+  }
+  .kpi-grid > .summary-primary + .summary-primary dd {
+    font-size: 30px;
+  }
+  .exposure-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .exposure-strip .summary-figure dd {
+    font-size: 16px;
+  }
+  .chart-surface,
+  .viz-allocation,
+  .section,
+  .panel {
+    padding: 20px 16px;
+  }
+  .viz-grid {
+    gap: 20px;
+  }
+  .viz-allocation .allocation {
+    display: block;
+  }
+  .donut {
+    width: min(100%, 270px);
+    margin: 20px auto;
+  }
+  .scenario-fraction {
+    font-size: 21px;
+  }
+  .currency-section .allocation-value {
+    font-size: 17px;
+  }
+  .tour-card {
+    padding: 16px;
   }
 }
-
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
