@@ -61,7 +61,9 @@ describe('guided tour behaviour', () => {
     await click(el(container, 'tour-start'));
     expect(el(container, 'tour-start').getAttribute('aria-pressed')).toBe('true');
     // The section each step sits directly above, in order.
-    const expected = ['summary', 'summary', 'panels', 'positions', 'loss', 'panels'];
+    // Fintech layout: steps 1-3 above the KPI cards, 4-5 above the visualisation grid, 6 above
+    // the risk-signal cards (every step moves down the page).
+    const expected = ['summary', 'summary', 'summary', 'charts', 'charts', 'panels'];
     const titles: string[] = [];
     for (const [i, anchor] of expected.entries()) {
       const c = card(container) as HTMLElement;
@@ -78,9 +80,7 @@ describe('guided tour behaviour', () => {
           ? next.getAttribute('data-testid') === 'summary'
           : anchor === 'panels'
             ? next.classList.contains('panels')
-            : anchor === 'positions'
-              ? next.getAttribute('aria-labelledby') === 'positions-title'
-              : next.getAttribute('data-testid') === 'loss-distribution';
+            : next.getAttribute('data-testid') === 'viz-grid';
       expect(target, `step ${String(i + 1)} sits above ${anchor}`).toBe(true);
       expect(container.querySelectorAll('[data-testid="tour-card"]')).toHaveLength(1);
       if (i < expected.length - 1) await click(el(container, 'tour-next'));
@@ -179,7 +179,7 @@ describe('guided tour content (backend text only, honest provenance)', () => {
     expect(text).toContain(`portfolio ${view.portfolioId} (base currency EUR)`);
     expect(text).toContain('NAV is 22375.74 EUR: net exposure plus cash, in EUR.');
     expect(text).toContain('Base VaR is 124.10 EUR at 95% confidence over 1 trading day.');
-    expect(text).toContain('The dashed marker is the raw 95% quantile');
+    expect(text).toContain('The dashed orange marker is the raw 95% quantile');
     expect(text).toContain('not the worst possible loss and not a maximum drawdown');
   });
 

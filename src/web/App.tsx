@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import type { DashboardIndexResponse, DashboardViewResponse } from '../shared/apiContracts/index.js';
+import { AllocationChart } from './components/AllocationChart.tsx';
 import { LossDistributionSection } from './components/LossDistribution.tsx';
 import { AdjustedVarPanel, BaseVarPanel, FilingPanel, SentimentPanel } from './components/Panels.tsx';
 import { CurrencyExposureSection, FxSection, PositionsSection } from './components/Sections.tsx';
@@ -226,10 +227,20 @@ export function App({
                   labelled DEMO_DATA and never raise alerts.
                 </p>
               ) : null}
-              {/* Group labels (institutional redesign): plain text before each group, outside
-                  the heading outline, so section headings stay h2 and the tour card stays
-                  directly above the section it explains. */}
-              <p className="eyebrow">Risk analysis</p>
+              {/* Fintech redesign (ui-guidelines §3): KPI cards, then the main visualisations
+                  (loss distribution beside allocation), then the four separate risk-dimension
+                  cards, then positions, currency, and FX. Group labels are plain text, outside
+                  the heading outline; each tour card stays directly above what it explains. */}
+              <p className="eyebrow">Risk visualisation</p>
+              {tourAt('charts')}
+              <div className="viz-grid" data-testid="viz-grid">
+                <LossDistributionSection data={data} />
+                <section className="section viz-allocation" aria-labelledby="allocation-heading">
+                  <h2 id="allocation-heading">Allocation</h2>
+                  <AllocationChart data={data} />
+                </section>
+              </div>
+              <p className="eyebrow">Risk signals</p>
               {tourAt('panels')}
               <div className="panels">
                 <BaseVarPanel data={data} />
@@ -237,14 +248,8 @@ export function App({
                 <SentimentPanel data={data} />
                 <FilingPanel data={data} />
               </div>
-              {/* S5 order (ui-guidelines §3): positions, then charts, then supporting detail.
-                  Currency exposure is followed by the FX rates behind it. */}
               <p className="eyebrow">Portfolio</p>
-              {tourAt('positions')}
               <PositionsSection data={data} />
-              <p className="eyebrow">Scenario distribution</p>
-              {tourAt('loss')}
-              <LossDistributionSection data={data} />
               <p className="eyebrow">Currency and FX</p>
               {/* Full width: at half width the exact FX rates wrap into unreadable columns. */}
               <CurrencyExposureSection data={data} />

@@ -36,6 +36,10 @@ export function SummarySection({ data }: { readonly data: View }): ReactElement 
   const money = data.display.exposure;
   const currency = data.display.currency;
   const base = data.view.baseVaR;
+  const adjusted = data.view.sentimentAdjustedVaR;
+  const availability = data.adjustedVaRAvailability;
+  // Instrument currencies exactly as the backend lists them (codes only, in backend order).
+  const currencies = data.display.currencyExposure.map((entry) => entry.currency);
   return (
     <section className="summary" aria-labelledby="summary-title" data-testid="summary">
       <h2 id="summary-title">
@@ -60,9 +64,11 @@ export function SummarySection({ data }: { readonly data: View }): ReactElement 
         </span>
         <Help term="states" />
       </p>
-      <dl className="summary-figures">
+      {/* Fintech redesign: four KPI cards. Every value is backend display text or a count of
+          backend rows; an unavailable figure is "Unavailable" or "—" with its reason. */}
+      <dl className="summary-figures kpi-grid" data-testid="kpi-grid">
         <Figure label="NAV" value={money.nav} currency={currency} testId="summary-nav" primary help="nav" />
-        <div className="summary-figure summary-primary">
+        <div className="summary-figure summary-primary kpi-var">
           <dt>
             Base VaR · 1 day · {confidencePct(data.view.confidence)}{' '}
             <Badge tone={toneOf(base.validity)} label={codeLabel(base.validity)} />
@@ -72,6 +78,32 @@ export function SummarySection({ data }: { readonly data: View }): ReactElement 
             {withUnit(data.display.baseVaR, currency)}
           </dd>
         </div>
+        <div className="summary-figure kpi-card" data-testid="kpi-adjusted">
+          <dt>Adjusted VaR · 1 day · {confidencePct(data.view.confidence)}</dt>
+          <dd className="num" data-testid="summary-adjusted-var">
+            {adjusted.value === null ? 'Unavailable' : withUnit(data.display.adjustedVaR, currency)}
+          </dd>
+          {adjusted.value === null && availability.reasonCode !== null ? (
+            <dd className="kpi-note">
+              <Badge
+                tone="info"
+                label={`${codeLabel(availability.reasonCode)}${availability.openDecision === null ? '' : ` · ${availability.openDecision}`}`}
+              />
+            </dd>
+          ) : null}
+        </div>
+        <div className="summary-figure kpi-card" data-testid="kpi-positions">
+          <dt>Positions</dt>
+          {/* A count of the backend's position rows (an integer, not a financial value). */}
+          <dd className="num" data-testid="summary-positions">
+            {String(data.view.assets.length)}
+          </dd>
+          <dd className="kpi-note" data-testid="summary-currencies">
+            {currencies.length === 0 ? MISSING : currencies.join(' · ')}
+          </dd>
+        </div>
+      </dl>
+      <dl className="summary-figures exposure-strip" data-testid="exposure-strip">
         <Figure
           label="Gross exposure"
           value={money.gross}

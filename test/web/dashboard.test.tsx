@@ -254,18 +254,25 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
       expect(text(row(container, 'DEMO-UK'))).toBe('2DEMO-UK29.74%');
       // Segments use the same adapter widths, in backend order; the bar is decorative, and each
       // segment carries its legend number so shade is never the only cue.
-      const composition = container.querySelector('[data-testid="allocation-composition"]') as HTMLElement;
+      // Fintech redesign: the ring's arcs use the same adapter widths, in backend order; the
+      // ring is decorative and each arc carries its legend number.
+      const composition = container.querySelector('[data-testid="allocation-composition"]') as Element;
       expect(composition.getAttribute('aria-hidden')).toBe('true');
-      const segments = [...composition.children].map((s) => [
+      const segments = [...composition.querySelectorAll('.donut-arc')].map((s) => [
         s.getAttribute('data-testid'),
-        (s as HTMLElement).style.width,
+        s.getAttribute('data-pct'),
       ]);
       expect(segments).toEqual([
-        ['allocation-segment-DEMO-EU', '40.2%'],
-        ['allocation-segment-DEMO-UK', '29.74%'],
-        ['allocation-segment-DEMO-US', '25.59%'],
+        ['allocation-segment-DEMO-EU', '40.2'],
+        ['allocation-segment-DEMO-UK', '29.74'],
+        ['allocation-segment-DEMO-US', '25.59'],
       ]);
-      expect([...composition.children].map((s) => s.textContent)).toEqual(['1', '2', '3']);
+      expect([...composition.querySelectorAll('.donut-label')].map((s) => s.textContent)).toEqual([
+        '1',
+        '2',
+        '3',
+      ]);
+      expect(composition.querySelector('.donut-center')?.textContent).toBe('3'); // count of rows
       // Each legend swatch matches its segment's shade class and number.
       expect(row(container, 'DEMO-EU').querySelector('.swatch')?.className).toBe('swatch seq-1');
       expect(row(container, 'DEMO-EU').querySelector('.swatch')?.textContent).toBe('1');
@@ -487,12 +494,16 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
   const section = (container: HTMLElement): HTMLElement =>
     container.querySelector('[data-testid="loss-distribution"]') as HTMLElement;
 
-  it('sits after the positions and before the currency exposure and FX rates (S5 order)', async () => {
+  it('fintech order: the main visual beside allocation, before the risk signals and the tables', async () => {
     const { container } = await show();
     const titles = [...container.querySelectorAll('main h2')].map((h) => h.id);
-    expect(titles.indexOf('loss-title')).toBe(titles.indexOf('positions-title') + 1);
-    expect(titles.indexOf('ccy-title')).toBe(titles.indexOf('loss-title') + 1);
-    expect(titles.indexOf('fx-title')).toBe(titles.indexOf('loss-title') + 2);
+    const grid = container.querySelector('[data-testid="viz-grid"]') as HTMLElement;
+    expect([...grid.querySelectorAll('h2')].map((h) => h.id)).toEqual(['loss-title', 'allocation-heading']);
+    expect(titles.indexOf('allocation-heading')).toBe(titles.indexOf('loss-title') + 1);
+    expect(titles.indexOf('base-var-title')).toBeGreaterThan(titles.indexOf('allocation-heading'));
+    expect(titles.indexOf('positions-title')).toBeGreaterThan(titles.indexOf('filing-title'));
+    // The loss distribution is the one navy chart surface.
+    expect(section(container).classList.contains('theme-dark')).toBe(true);
   });
 
   it('states the metric, parameters, calculation time, validity, and DEMO label', async () => {
@@ -537,8 +548,15 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
       '2.5 to 4.75 EUR (upper edge excluded): 2 scenarios',
       '4.75 to 7 EUR (upper edge included): 3 scenarios',
     ]);
-    // Plot 56..624 px, 4 slots of 142 px; heights from counts 3/2/2/3 over 180 px.
-    expect(bars.map((b) => b.getAttribute('height'))).toEqual(['180', '120', '120', '180']);
+    // Plot 56..624 px, 4 slots of 142 px; heights from counts 3/2/2/3 over 240 px (frame 320 tall).
+    expect(bars.map((b) => b.getAttribute('height'))).toEqual(['240', '160', '160', '240']);
+    // Tail emphasis by the backend's integer bucket index: the marker's bucket (index 3) and beyond.
+    expect(bars.map((b) => b.getAttribute('class'))).toEqual([
+      'chart-bar',
+      'chart-bar',
+      'chart-bar',
+      'chart-bar chart-bar-tail',
+    ]);
     const marker = container.querySelector('[data-testid="loss-var-marker"]') as SVGElement;
     expect(marker.getAttribute('x1')).toBe('595.6'); // 56 + 3.8 * 142
     expect(marker.querySelector('title')?.textContent).toBe('VaR 95%: raw quantile 6.55 EUR');
@@ -697,7 +715,6 @@ describe('S5 final polish', () => {
     const order = [...container.querySelectorAll('main section h2')].map((h) => h.id);
     expect(order.slice(order.indexOf('positions-title'))).toEqual([
       'positions-title',
-      'loss-title',
       'ccy-title',
       'fx-title',
     ]);
@@ -789,18 +806,18 @@ describe('institutional redesign (presentation only)', () => {
     const { container } = await show();
     const labels = [...container.querySelectorAll('main > .eyebrow')].map((e) => [e.tagName, e.textContent]);
     expect(labels).toEqual([
-      ['P', 'Risk analysis'],
+      ['P', 'Risk visualisation'],
+      ['P', 'Risk signals'],
       ['P', 'Portfolio'],
-      ['P', 'Scenario distribution'],
       ['P', 'Currency and FX'],
     ]);
     // Each label sits directly before its group.
     const next = (label: string) =>
       [...container.querySelectorAll('main > .eyebrow')].find((e) => e.textContent === label)
         ?.nextElementSibling;
-    expect(next('Risk analysis')?.classList.contains('panels')).toBe(true);
+    expect(next('Risk visualisation')?.getAttribute('data-testid')).toBe('viz-grid');
+    expect(next('Risk signals')?.classList.contains('panels')).toBe(true);
     expect(next('Portfolio')?.getAttribute('aria-labelledby')).toBe('positions-title');
-    expect(next('Scenario distribution')?.getAttribute('data-testid')).toBe('loss-distribution');
     expect(next('Currency and FX')?.getAttribute('aria-labelledby')).toBe('ccy-title');
   });
 
@@ -834,7 +851,10 @@ describe('institutional redesign (presentation only)', () => {
     expect(css).toMatch(/\.section,\s*\.panel:not\(\.panel-primary\) \{[^}]*var\(--color-border-subtle\)/);
     expect(css).toMatch(/\.summary-primary \+ \.summary-figure:not\(\.summary-primary\) \{[^}]*border-left/);
     // Teal stays interaction-only: no accent in the redesign block's data or surface rules.
-    const block = css.slice(css.indexOf('Institutional redesign.'), css.indexOf('/* Responsive layout */'));
+    const block = css.slice(
+      css.indexOf('Institutional redesign.'),
+      css.indexOf('Fintech redesign (ui-guidelines'),
+    );
     expect(block).not.toMatch(/--color-accent/);
   });
 });
@@ -871,11 +891,76 @@ describe('loss distribution layout (final refinement)', () => {
     expect(container.querySelectorAll('[aria-describedby="loss-exact-hint"]')).toHaveLength(1);
   });
 
-  it('the stylesheet: one column by default, two from 1100 px, an opened disclosure spans the card', () => {
+  it('the stylesheet: the loss card is one column; the visualisation grid is 2:1 and collapses at 1100 px', () => {
     expect(css).toMatch(/\.loss-layout \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\);/);
+    expect(css).not.toMatch(/minmax\(600px, 800px\) minmax\(16rem, 1fr\)/);
     expect(css).toMatch(
-      /@media \(min-width: 1100px\) \{\s*\.loss-layout \{\s*grid-template-columns: minmax\(600px, 800px\) minmax\(16rem, 1fr\);/,
+      /\.viz-grid \{\s*display: grid;\s*grid-template-columns: minmax\(0, 2fr\) minmax\(300px, 1fr\);/,
     );
-    expect(css).toMatch(/\.loss-details\[open\] \{\s*grid-column: 1 \/ -1;/);
+    expect(css).toMatch(
+      /@media \(max-width: 1100px\) \{\s*\.viz-grid \{\s*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+  });
+
+  it('light theme with a navy scope: text tokens reach 4.5:1 on every navy surface too', () => {
+    const scope = css.slice(css.indexOf('.theme-dark {'), css.indexOf('}', css.indexOf('.theme-dark {')));
+    const hex = (name: string): string => {
+      const m = new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i').exec(scope);
+      if (m?.[1] === undefined) throw new Error(`dark token ${name} missing`);
+      return m[1];
+    };
+    // WCAG relative luminance; colour arithmetic only (not financial values).
+    const lum = (h: string): number =>
+      [1, 3, 5]
+        .map((i) => Number.parseInt(h.slice(i, i + 2), 16) / 255)
+        .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+        .reduce((sum, c, i) => sum + c * ([0.2126, 0.7152, 0.0722][i] ?? 0), 0);
+    const ratio = (a: string, b: string): number => {
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    for (const surface of ['color-panel', 'color-raised', 'color-row-hover']) {
+      for (const fg of [
+        'color-text',
+        'color-text-secondary',
+        'color-warning',
+        'color-accent',
+        'color-info',
+        'color-critical',
+      ]) {
+        expect(ratio(hex(fg), hex(surface)), `${fg} on dark ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+      // Chart marks (graphics, 3:1): the bars, the orange tail and marker.
+      for (const mark of ['chart-bar', 'chart-tail']) {
+        expect(ratio(hex(mark), hex(surface)), `${mark} on dark ${surface}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+});
+
+describe('sidebar navigation (fintech refinement)', () => {
+  it('a labelled nav in the sidebar links to section headings that exist on the page', async () => {
+    const { container } = await show();
+    const nav = container.querySelector('header.topbar nav.sidebar-nav') as HTMLElement;
+    expect(nav.getAttribute('aria-label')).toBe('Dashboard sections');
+    const links = [...nav.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')]);
+    expect(links).toEqual([
+      ['Overview', '#summary-title'],
+      ['Loss distribution', '#loss-title'],
+      ['Allocation', '#allocation-heading'],
+      ['Risk signals', '#base-var-title'],
+      ['Positions', '#positions-title'],
+      ['Currency and FX', '#ccy-title'],
+    ]);
+    for (const [, href] of links) {
+      expect(container.querySelector(String(href))?.tagName, String(href)).toBe('H2');
+    }
+    // The nav precedes the page controls in the DOM (identity and navigation, then controls).
+    const select = container.querySelector('#portfolio-select') as HTMLElement;
+    expect(nav.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('the stylesheet hides the section links on phones, where the sidebar is a compact header', () => {
+    expect(css).toMatch(/@media \(max-width: 760px\) \{[\s\S]*?\.sidebar-nav \{\s*display: none;/);
   });
 });

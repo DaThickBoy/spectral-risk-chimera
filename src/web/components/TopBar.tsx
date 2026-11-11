@@ -27,6 +27,16 @@ function ChimeraMark(): ReactElement {
   );
 }
 
+/** Sidebar links: each targets an existing section heading's id. */
+const SECTIONS: readonly (readonly [string, string])[] = [
+  ['#summary-title', 'Overview'],
+  ['#loss-title', 'Loss distribution'],
+  ['#allocation-heading', 'Allocation'],
+  ['#base-var-title', 'Risk signals'],
+  ['#positions-title', 'Positions'],
+  ['#ccy-title', 'Currency and FX'],
+];
+
 const STREAM_BADGE: Readonly<Record<StreamState, { tone: BadgeTone; label: string }>> = {
   CONNECTING: { tone: 'neutral', label: 'STREAM CONNECTING' },
   CONNECTED: { tone: 'current', label: 'STREAM CONNECTED' },
@@ -79,78 +89,109 @@ export function TopBar(props: {
   readonly tourActive: boolean;
 }): ReactElement {
   const { data } = props;
+  // Fintech redesign: the navy sidebar (header.topbar) carries identity and every provenance
+  // item; the light page header carries the title and controls. DOM order is unchanged:
+  // identity first, then the controls, so the keyboard order stays skip link, selector, Reload.
+  const controls = (
+    <div className="topbar-controls">
+      <label htmlFor="portfolio-select">Portfolio</label>
+      <select
+        id="portfolio-select"
+        value={props.selected ?? ''}
+        onChange={(event) => props.onSelect(event.currentTarget.value)}
+        disabled={props.index === undefined || props.index.portfolios.length === 0}
+      >
+        {(props.index?.portfolios ?? []).map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.id} ({p.baseCurrency})
+          </option>
+        ))}
+      </select>
+      <button type="button" onClick={props.onReload}>
+        Reload
+      </button>
+      {/* Guided tour (ui-guidelines §8): optional, user-started; pressed while running. */}
+      <button
+        type="button"
+        id="tour-start"
+        onClick={props.onTour}
+        aria-pressed={props.tourActive}
+        disabled={data === undefined}
+        data-testid="tour-start"
+      >
+        Guided tour
+      </button>
+    </div>
+  );
   return (
-    <header className="topbar">
-      <div className="brand">
-        <ChimeraMark />
-        <div>
-          <h1 className="brand-name">Spectral Risk Chimera</h1>
-          <p className="brand-tag">Kiroween 2026 · Frankenstein build · monitoring only, no trading</p>
+    <>
+      <header className="topbar theme-dark">
+        <div className="brand">
+          <ChimeraMark />
+          <div>
+            <h1 className="brand-name">Spectral Risk Chimera</h1>
+            <p className="brand-tag">Kiroween 2026 · Frankenstein build · monitoring only, no trading</p>
+          </div>
         </div>
+        <dl className="topbar-facts" aria-label="Data status">
+          <div>
+            <dt>Data</dt>
+            <dd>
+              {data === undefined ? (
+                MISSING
+              ) : (
+                <Badge tone={toneOf(data.dataMode)} label={data.dataMode === 'DEMO' ? 'DEMO DATA' : 'REAL'} />
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Source</dt>
+            <dd>
+              {props.source === undefined ? (
+                MISSING
+              ) : props.source.kind === 'REPLAY' ? (
+                <>
+                  <Badge tone="info" label="RECORDED REPLAY" title="Recorded responses, not live data" />{' '}
+                  recorded {utcText(props.source.recordedAt ?? null)}
+                </>
+              ) : (
+                <>
+                  Live local backend <LiveStatus refreshError={props.refreshError} />
+                </>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Mode</dt>
+            <dd>{data === undefined ? MISSING : codeLabel(data.runMode)}</dd>
+          </div>
+        </dl>
+        {props.source?.note !== undefined ? <p className="replay-note">{props.source.note}</p> : null}
+        {/* In-page links to the dashboard's existing section headings (only once they exist).
+            Hidden on narrow screens, where the sidebar is a compact header. */}
+        {data === undefined ? null : (
+          <nav className="sidebar-nav" aria-label="Dashboard sections">
+            <ul>
+              {SECTIONS.map(([href, label]) => (
+                <li key={href}>
+                  <a href={href}>{label}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+      </header>
+      <div className="page-header" role="region" aria-label="Portfolio overview and controls">
+        <div>
+          <p className="page-title">Portfolio overview</p>
+          <p className="page-subtitle">
+            {data === undefined
+              ? 'Loading portfolio data'
+              : `${data.portfolioId} · base currency ${data.view.baseCurrency}`}
+          </p>
+        </div>
+        {controls}
       </div>
-      <div className="topbar-controls">
-        <label htmlFor="portfolio-select">Portfolio</label>
-        <select
-          id="portfolio-select"
-          value={props.selected ?? ''}
-          onChange={(event) => props.onSelect(event.currentTarget.value)}
-          disabled={props.index === undefined || props.index.portfolios.length === 0}
-        >
-          {(props.index?.portfolios ?? []).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.id} ({p.baseCurrency})
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={props.onReload}>
-          Reload
-        </button>
-        {/* Guided tour (ui-guidelines §8): optional, user-started; pressed while running. */}
-        <button
-          type="button"
-          id="tour-start"
-          onClick={props.onTour}
-          aria-pressed={props.tourActive}
-          disabled={data === undefined}
-          data-testid="tour-start"
-        >
-          Guided tour
-        </button>
-      </div>
-      <dl className="topbar-facts" aria-label="Data status">
-        <div>
-          <dt>Data</dt>
-          <dd>
-            {data === undefined ? (
-              MISSING
-            ) : (
-              <Badge tone={toneOf(data.dataMode)} label={data.dataMode === 'DEMO' ? 'DEMO DATA' : 'REAL'} />
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>Source</dt>
-          <dd>
-            {props.source === undefined ? (
-              MISSING
-            ) : props.source.kind === 'REPLAY' ? (
-              <>
-                <Badge tone="info" label="RECORDED REPLAY" title="Recorded responses, not live data" />{' '}
-                recorded {utcText(props.source.recordedAt ?? null)}
-              </>
-            ) : (
-              <>
-                Live local backend <LiveStatus refreshError={props.refreshError} />
-              </>
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>Mode</dt>
-          <dd>{data === undefined ? MISSING : codeLabel(data.runMode)}</dd>
-        </div>
-      </dl>
-      {props.source?.note !== undefined ? <p className="replay-note">{props.source.note}</p> : null}
-    </header>
+    </>
   );
 }

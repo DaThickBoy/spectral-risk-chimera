@@ -8,27 +8,28 @@ The Spectral Risk Chimera dashboard is an institutional financial terminal. It s
 
 ## 1. Visual style
 
-Design direction (approved for the hackathon experience pass): a premium institutional risk-analytics platform. It is calm and precise, never a crypto trading terminal.
+Design direction (approved for the modern fintech pass, decisions D1–D3): a premium, modern fintech portfolio-analytics dashboard. It is clear and precise, never a crypto trading terminal.
 
-- Dark theme only in version 1. The foundation is charcoal and deep navy, in restrained layers:
+- Light theme (D1). A light canvas with white elevated cards, a deep navy sidebar, and selective deep navy chart surfaces:
 
-  | Token | Value | Use |
+  | Token (`:root`) | Value | Use |
   |---|---|---|
-  | `--color-bg` | `#0B0E13` | Page background (charcoal) |
-  | `--color-panel` | `#12161D` | Panels and sections |
-  | `--color-panel-navy` | `#101A29` | Headline surfaces: top bar and portfolio summary |
-  | `--color-raised` | `#18202E` | Raised navy layer: primary panel, table headers, controls, help panels |
-  | `--color-border` | `#232D3C` | Default 1px borders |
-  | `--color-border-strong` | `#34435A` | Primary panel and headline borders |
+  | `--color-bg` | `#F3F5F9` | Page canvas |
+  | `--color-panel` | `#FFFFFF` | Cards, sections, panels |
+  | `--color-raised` | `#F1F4F9` | Raised layer: primary panel, table headers, controls, help panels |
+  | `--color-border` / `--color-border-subtle` | `#E2E7EF` / `#E9EDF3` | Hairline borders |
+  | `--shadow-card` | two soft layers | Card elevation (subtle; no heavy shadows) |
 
-- Text: primary `#E6E9EF`, secondary `#9AA3B2`, muted `#6B7482`. Never use muted text for data values.
-- One interaction accent: teal `#2EC4B6` (`--color-accent`), for focus rings, hover, and selected or active controls only. Do not use it for data meaning, and do not add a second interaction accent.
-- Informational blue `#4C8DFF` (`--color-info`): neutral provenance and information only, such as `DEMO` badges, the DEMO notice, and informational badges. It is never an interaction colour and never a risk signal.
+- Navy surfaces use the `.theme-dark` scope, which re-declares the same tokens (panel `#0F1D38`, text `#E8EDF6`, accent `#2EC4B6`, info `#8FB0FF`), so every component renders correctly on either surface. Only the sidebar and chart surfaces (the loss distribution) use it.
+- Text (light): primary `#111A2E`, secondary `#4B5567`, muted `#667085`. Never use muted text for data values.
+- One interaction accent: teal (`--color-accent`; `#0F766E` on light, `#2EC4B6` on navy), for focus rings, hover, and selected or active controls only. Do not use it for data meaning, and do not add a second interaction accent.
+- Informational blue (`--color-info`): neutral provenance and information only, such as `DEMO` badges, the DEMO notice, and informational badges. It is never an interaction colour and never a risk signal.
 - Amber (`--color-warning`) is only for meaningful warnings and stale data. Never use it decoratively or for DEMO.
 - Red (`--color-negative`, `--color-critical`) is only for genuine errors (for example a failed data load) and adverse risk states.
-- Flat surfaces with 1px borders. No gradients, glows, glassmorphism, or heavy shadows.
+- Chart palette (D2), separate from the status colours: categorical position and currency shades are blue, green, and violet (`--chart-seq-1` to `-6`), each at least 3:1 on its surface, with position numbers so colour is never the only cue. Orange (`--chart-tail`, `--chart-marker`) is only for the VaR marker and the tail (the bucket holding the marker and any beyond), always with a text label in the legend.
+- No gradients, glows, or glassmorphism.
 - Define all colours, spacing, and type sizes as design tokens (CSS variables). Do not hardcode hex values in components.
-- Text and badges keep at least 4.5:1 contrast on every surface token. The stylesheet test checks text, warning, accent, info, and critical tokens against each surface.
+- Text and badges keep at least 4.5:1 contrast on every surface token, light and navy. The stylesheet test checks text, warning, accent, info, and critical tokens against each surface in both scopes.
 
 ## 2. Typography and numbers
 
@@ -41,10 +42,12 @@ Design direction (approved for the hackathon experience pass): a premium institu
 
 ## 3. Information hierarchy
 
-- Top bar: identity, portfolio selection, data mode, source, and run mode; in LIVE mode, connection and provider status.
-- Portfolio summary directly below it: NAV and Base VaR as the two largest figures, then exposures and cash, with the data mode, freshness, and as-of time.
-- Primary row: four separate panels in this order: Base VaR, Sentiment-Adjusted VaR, Market Sentiment, SEC Filing Risk (R35.1). Never merge them into one gauge or score.
-- Then positions and allocation table, then charts, then alerts and audit detail.
+- Navy sidebar (`header.topbar`): identity, data mode, source and recording time, run mode, and the replay note; in LIVE mode, connection and provider status. Provenance stays visible.
+- Page header: "Portfolio overview", the portfolio and base currency, the portfolio selector, Reload, and Guided tour.
+- Primary row (D3): four KPI cards: Portfolio NAV, Base VaR, Adjusted VaR (the figure, or "Unavailable" with its reason), and Positions (a count of backend rows). NAV and Base VaR are the two largest figures; exposures and cash follow in a strip.
+- Main visualisations: the loss distribution (on a navy chart surface) beside the allocation ring.
+- Risk signals: the four risk dimensions as four separate cards, in this order: Base VaR, Sentiment-Adjusted VaR, Market Sentiment, SEC Filing Risk (R35.1). Never merge them into one gauge or score.
+- Then positions, currency exposure and FX rates, then alerts and audit detail.
 - Each panel header states what the value is, its parameters, and its time: for example `Adjusted VaR · 1 day · 95% · as of 2026-11-06`.
 - Show why Adjusted VaR differs from Base VaR, or that no position triggered. When Adjusted VaR is unavailable, show "Unavailable" and the reason in its own panel; never show the Base figure there (R35.6, R17.10).
 - Use progressive disclosure: summary first, details on expand. Do not hide current status behind interaction.

@@ -17,8 +17,10 @@ import type { Page } from '@playwright/test';
 
 const BASE = '/spectral-risk-chimera/';
 const AXE_SOURCE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
-/** `--color-accent` (teal #2ec4b6, ui-guidelines §1) as computed by the browser. */
-const ACCENT = 'rgb(46, 196, 182)';
+/** `--color-accent` on light surfaces (teal #0f766e, ui-guidelines §1) as computed by the browser. */
+const ACCENT = 'rgb(15, 118, 110)';
+/** `--color-accent` inside `.theme-dark` (navy sidebar and chart surface: teal #2ec4b6). */
+const ACCENT_ON_NAVY = 'rgb(46, 196, 182)';
 const PHONE = { width: 390, height: 844 };
 
 /**
@@ -189,7 +191,12 @@ test.describe('390 px phone viewport', () => {
     await loaded(page);
     const chart = page.getByRole('region', { name: 'Loss distribution chart, scrollable' });
     await chart.focus();
-    expect(await focused(page)).toMatchObject({ tag: 'div', outlineStyle: 'solid', outlineColor: ACCENT });
+    // The loss chart sits on the navy chart surface, where the accent is the lighter teal.
+    expect(await focused(page)).toMatchObject({
+      tag: 'div',
+      outlineStyle: 'solid',
+      outlineColor: ACCENT_ON_NAVY,
+    });
     const metrics = await inPage<{
       wrapRight: number;
       scrollWidth: number;
@@ -212,8 +219,91 @@ test.describe('390 px phone viewport', () => {
       })()`,
     );
     expect(metrics.wrapRight).toBeLessThanOrEqual(PHONE.width);
-    expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+    // Fintech refinement: the compact frame fits the phone, so the chart no longer scrolls
+    // sideways, and its text stays readable (rendered at 12 px or more).
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
     expect(metrics.fontPx).toBeGreaterThanOrEqual(12);
+    // The marker, its label, and the tail are all still drawn.
+    await expect(page.getByTestId('loss-var-marker')).toHaveCount(1);
+    await expect(page.locator('.loss-chart .chart-marker-label')).toContainText('VaR 95% · 124.10 EUR');
+    await expect(page.locator('.loss-chart .chart-bar-tail')).not.toHaveCount(0);
+    await expect(page.locator('[data-testid^="loss-bar-"]')).toHaveCount(20);
+  });
+});
+
+test.describe('loss chart responsive geometry (regression)', () => {
+  const metrics = (page: Page) =>
+    inPage<{ doc: number; card: number; scrolls: boolean; compact: boolean; textPx: number; bars: number }>(
+      page,
+      `(() => {
+        const card = document.querySelector('[data-testid="loss-distribution"]');
+        const wrap = card.querySelector('.chart-wrap');
+        const svg = wrap.querySelector('svg');
+        const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+        return {
+          doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          card: card.scrollWidth - card.clientWidth,
+          scrolls: wrap.scrollWidth > wrap.clientWidth,
+          compact: svg.classList.contains('loss-chart-compact'),
+          textPx: parseFloat(getComputedStyle(svg.querySelector('.chart-tick')).fontSize) * scale,
+          bars: svg.querySelectorAll('[data-testid^="loss-bar-"]').length,
+        };
+      })()`,
+    );
+
+  // 320-430: phones; 761: just above the breakpoint, where the chart card is still narrow.
+  for (const width of [320, 360, 390, 430, 761]) {
+    test(`at ${String(width)} px: no overflow, readable text, every bar, marker, tail, and legend`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await loaded(page);
+      const m = await metrics(page);
+      expect(m.doc, 'document overflow').toBeLessThanOrEqual(0);
+      expect(m.card, 'chart card overflow').toBeLessThanOrEqual(0);
+      expect(m.scrolls, 'chart scrolls sideways').toBe(false);
+      expect(m.compact).toBe(true);
+      expect(m.textPx).toBeGreaterThanOrEqual(12);
+      expect(m.bars).toBe(20);
+      // A vertical line has a zero-width box (Playwright calls it hidden), so check its geometry:
+      // the marker exists and its x lies inside the viewBox's plot area.
+      const marker = await inPage<{ x: number; width: number }>(
+        page,
+        `(() => {
+          const svg = document.querySelector('[data-testid="loss-chart"]');
+          return { x: Number.parseFloat(svg.querySelector('[data-testid="loss-var-marker"]').getAttribute('x1')), width: svg.viewBox.baseVal.width };
+        })()`,
+      );
+      expect(marker.x).toBeGreaterThan(0);
+      expect(marker.x).toBeLessThanOrEqual(marker.width);
+      await expect(page.locator('.loss-chart .chart-marker-label')).toContainText('VaR 95% · 124.10 EUR');
+      await expect(page.locator('.loss-chart .chart-bar-tail')).not.toHaveCount(0);
+      await expect(page.locator('[data-testid="loss-distribution"] .legend')).toContainText('(tail)');
+    });
+  }
+
+  test('resizing after the first render switches between the wide and compact geometry', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await loaded(page);
+    const viewBox = () => page.getByTestId('loss-chart').getAttribute('viewBox');
+    expect(await viewBox()).toBe('0 0 640 320');
+    for (const [width, compact] of [
+      [390, true],
+      [761, true],
+      [1440, false],
+      [360, true],
+      [1440, false],
+    ] as const) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect
+        .poll(async () => (await metrics(page)).compact, { message: `compact at ${String(width)} px` })
+        .toBe(compact);
+      const m = await metrics(page);
+      expect(m.doc, `document overflow at ${String(width)} px`).toBeLessThanOrEqual(0);
+      expect(m.scrolls, `chart scrolls at ${String(width)} px`).toBe(false);
+      expect(m.bars).toBe(20);
+    }
+    expect(await viewBox()).toBe('0 0 640 320');
   });
 });
 
@@ -231,6 +321,23 @@ test.describe('keyboard', () => {
       outlineColor: ACCENT,
       outlineWidth: '2px',
     });
+    // Then the sidebar's section links, in order, with the navy-surface focus ring.
+    for (const label of [
+      'Overview',
+      'Loss distribution',
+      'Allocation',
+      'Risk signals',
+      'Positions',
+      'Currency and FX',
+    ]) {
+      await page.keyboard.press('Tab');
+      expect(await focused(page), label).toMatchObject({
+        tag: 'a',
+        text: label,
+        outlineStyle: 'solid',
+        outlineColor: ACCENT_ON_NAVY,
+      });
+    }
     await page.keyboard.press('Tab');
     expect(await focused(page)).toMatchObject({
       tag: 'select',

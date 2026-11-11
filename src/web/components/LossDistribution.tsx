@@ -1,7 +1,8 @@
 // Loss distribution of the Base VaR scenarios (Kiroween decision A2; ui-guidelines 5).
 // Every value is backend text: exact canonical decimals in the table and tooltips, backend
 // display strings on the axis. Geometry comes from the chart adapter; nothing is calculated here.
-import type { ReactElement } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactElement, RefObject } from 'react';
 import type { DashboardViewResponse } from '../../shared/apiContracts/index.js';
 import { histogramPlot } from '../chartAdapter.js';
 import type { AvailableLossDistribution, ChartFrame } from '../chartAdapter.js';
@@ -11,15 +12,53 @@ import { Help } from './Help.tsx';
 
 type View = DashboardViewResponse;
 
-const FRAME: ChartFrame = { width: 640, height: 260, left: 56, right: 16, top: 28, bottom: 52 };
-/** Pixel x of the rotated y-axis label. */
-const AXIS_LABEL_X = 14;
+// Fintech redesign: a taller frame so the histogram is the dashboard's main visual.
+const FRAME: ChartFrame = { width: 640, height: 320, left: 56, right: 16, top: 28, bottom: 52 };
+// Narrow containers (phones, and tablets where the chart card is under 600 px): a compact frame
+// exactly as wide as the chart's container, so the SVG is drawn at 1:1 and its text stays at its
+// CSS size with no sideways scrolling. Same buckets, marker, tail, and labels; only the pixel
+// geometry differs (the adapter places bars by integer bucket index).
+const COMPACT_BELOW_PX = 600;
+const COMPACT_MIN_PX = 240;
+const compactFrame = (width: number): ChartFrame => ({
+  width: width < COMPACT_MIN_PX ? COMPACT_MIN_PX : width, // pixel width, not a financial value
+  height: 300,
+  left: 40,
+  right: 10,
+  top: 28,
+  bottom: 52,
+});
+
+/**
+ * The chart container's width in CSS pixels, tracked across resizes, or null where it cannot be
+ * measured (jsdom, or browsers without ResizeObserver), which keeps the wide frame.
+ */
+function useContainerWidth(ref: RefObject<HTMLElement | null>, mountKey: string): number | null {
+  const [width, setWidth] = useState<number | null>(null);
+  useEffect(() => {
+    const element = ref.current;
+    if (element === null || typeof ResizeObserver !== 'function') return undefined;
+    const update = (): void => setWidth(element.clientWidth);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref, mountKey]); // re-attach when the chart container appears or is replaced
+  return width;
+}
 
 const rangeText = (bucket: AvailableLossDistribution['buckets'][number], currency: string): string =>
   `${bucket.lower} to ${bucket.upper} ${currency} (${bucket.upperInclusive ? 'upper edge included' : 'upper edge excluded'})`;
 
-function Chart({ dist }: { readonly dist: AvailableLossDistribution }): ReactElement {
-  const plot = histogramPlot(dist, FRAME);
+function Chart(props: {
+  readonly dist: AvailableLossDistribution;
+  readonly containerWidth: number | null;
+}): ReactElement {
+  const { dist, containerWidth } = props;
+  const compact = containerWidth !== null && containerWidth < COMPACT_BELOW_PX;
+  const frame = compact ? compactFrame(containerWidth) : FRAME;
+  const axisLabelX = compact ? 12 : 14; // pixel x of the rotated y-axis label
+  const plot = histogramPlot(dist, frame);
   const currency = dist.currency;
   const confidence = confidencePct(dist.confidence);
   const marker = `VaR ${confidence} · ${dist.varMarker.rawQuantileDisplay} ${currency}`;
@@ -27,8 +66,8 @@ function Chart({ dist }: { readonly dist: AvailableLossDistribution }): ReactEle
   const last = dist.buckets.at(-1);
   return (
     <svg
-      className="loss-chart"
-      viewBox={`0 0 ${String(FRAME.width)} ${String(FRAME.height)}`}
+      className={compact ? 'loss-chart loss-chart-compact' : 'loss-chart'}
+      viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
       role="img"
       aria-labelledby="loss-chart-title loss-chart-desc"
       data-testid="loss-chart"
@@ -75,15 +114,15 @@ function Chart({ dist }: { readonly dist: AvailableLossDistribution }): ReactEle
       <text className="chart-tick" x={plot.plotRight} y={plot.plotBottom} dy={18} textAnchor="end">
         {last === undefined ? MISSING : `${last.upperDisplay} ${currency}`}
       </text>
-      <text className="chart-axis-label" x={plot.centerX} y={FRAME.height} dy={-8} textAnchor="middle">
+      <text className="chart-axis-label" x={plot.centerX} y={frame.height} dy={-8} textAnchor="middle">
         Loss ({currency}); negative values are gains
       </text>
       <text
         className="chart-axis-label"
-        x={AXIS_LABEL_X}
+        x={axisLabelX}
         y={plot.centerY}
         textAnchor="middle"
-        transform={`rotate(-90 ${String(AXIS_LABEL_X)} ${String(plot.centerY)})`}
+        transform={`rotate(-90 ${String(axisLabelX)} ${String(plot.centerY)})`}
       >
         Scenarios (count)
       </text>
@@ -93,7 +132,9 @@ function Chart({ dist }: { readonly dist: AvailableLossDistribution }): ReactEle
         return bucket === undefined ? null : (
           <rect
             key={bar.index}
-            className="chart-bar"
+            // Tail emphasis by the backend's integer bucket index (no money comparison): the
+            // bucket holding the VaR marker and every bucket beyond it.
+            className={bar.index >= dist.varMarker.bucketIndex ? 'chart-bar chart-bar-tail' : 'chart-bar'}
             x={bar.x}
             y={bar.y}
             width={bar.width}
@@ -131,13 +172,19 @@ function Chart({ dist }: { readonly dist: AvailableLossDistribution }): ReactEle
 
 export function LossDistributionSection({ data }: { readonly data: View }): ReactElement {
   const dist = data.lossDistribution;
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const chartWidth = useContainerWidth(wrapRef, `${data.portfolioId}:${dist.status}`);
   const base = data.view.baseVaR;
   const params =
     dist.status === 'AVAILABLE'
       ? `Base VaR scenarios · 1 day · ${confidencePct(dist.confidence)} · Historical Simulation · as of ${utcText(dist.calculatedAt)}`
       : `Base VaR scenarios · 1 day · ${confidencePct(data.view.confidence)} · Historical Simulation`;
   return (
-    <section className="section" aria-labelledby="loss-title" data-testid="loss-distribution">
+    <section
+      className="section chart-surface theme-dark"
+      aria-labelledby="loss-title"
+      data-testid="loss-distribution"
+    >
       <h2 id="loss-title">
         Loss distribution <span className="muted-inline">· {params}</span>
       </h2>
@@ -157,8 +204,8 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
           Unavailable ({codeLabel(dist.reason)}): {dist.explanation}
         </p>
       ) : (
-        // Layout only: on wide screens the chart and its supporting text sit side by side; the
-        // DOM order (chart first) is the reading and mobile order. No value changes here.
+        // Layout only: chart first, then the summary and disclosure (the DOM order is the reading
+        // order on every screen size). No value changes here.
         <div className="loss-layout" data-testid="loss-layout">
           <div className="loss-main" data-testid="loss-main">
             <div className="legend" aria-hidden="true">
@@ -166,18 +213,24 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
                 <span className="legend-swatch legend-bar" /> Scenario losses per bucket
               </span>
               <span className="legend-item">
+                <span className="legend-swatch legend-tail" /> Bucket with the VaR{' '}
+                {confidencePct(dist.confidence)} marker and beyond (tail)
+              </span>
+              <span className="legend-item">
                 <span className="legend-swatch legend-marker" /> VaR {confidencePct(dist.confidence)} (raw
                 quantile)
               </span>
             </div>
-            {/* Focusable so keyboard users can scroll the chart on narrow screens (WCAG 2.1.1). */}
+            {/* Measured container for the chart frame; the chart fits its width, so it no longer
+                scrolls. The focusable region and its label are kept unchanged (tests rely on them). */}
             <div
+              ref={wrapRef}
               className="chart-wrap"
               role="region"
               aria-label="Loss distribution chart, scrollable"
               tabIndex={0}
             >
-              <Chart dist={dist} />
+              <Chart dist={dist} containerWidth={chartWidth} />
             </div>
           </div>
           <div className="loss-side" data-testid="loss-side">

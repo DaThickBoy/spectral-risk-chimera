@@ -372,8 +372,10 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
         expect(m.divider).toBe('solid');
         expect(m.gap).toBeGreaterThanOrEqual(40); // was about 23 px before the review fix
       } else {
-        expect(m.sameRow).toBe(false); // stacked on the phone
-        expect(m.divider).toBe('none');
+        // Fintech redesign: on the phone NAV and Base VaR are separate full-width KPI cards,
+        // stacked, each with its own card border.
+        expect(m.sameRow).toBe(false);
+        expect(m.divider).toBe('solid');
       }
     });
   }
@@ -397,13 +399,17 @@ test.describe('loss distribution layout', () => {
         const c = await chart.boundingBox();
         const s = await summary.boundingBox();
         if (c === null || s === null) throw new Error('missing layout boxes');
+        // Fintech redesign: the loss card is one column at every size (chart, then summary).
+        expect(s.y).toBeGreaterThanOrEqual(c.y + c.height);
+        const a = await page.getByTestId('allocation-chart').boundingBox();
+        if (a === null) throw new Error('missing allocation box');
         if (viewport.width === 1440) {
-          // Two columns: the summary sits to the right of the chart, starting near its top.
-          expect(s.x).toBeGreaterThanOrEqual(c.x + c.width);
-          expect(s.y).toBeLessThan(c.y + c.height / 2);
+          // The main visualisation sits beside the allocation ring, starting on the same row.
+          expect(a.x).toBeGreaterThanOrEqual(c.x + c.width);
+          expect(a.y).toBeLessThan(c.y + c.height / 2);
         } else {
-          // One column: the chart comes first, the summary below it.
-          expect(s.y).toBeGreaterThanOrEqual(c.y + c.height);
+          // One column on the phone: the loss chart first, then the allocation ring below.
+          expect(a.y).toBeGreaterThanOrEqual(c.y + c.height);
         }
         // The disclosure opens by keyboard and shows its hint and exact values.
         await details.locator('summary').focus();
@@ -413,15 +419,12 @@ test.describe('loss distribution layout', () => {
         await expect(
           page.getByRole('region', { name: 'Exact loss distribution values, scrollable' }),
         ).toBeVisible();
-        if (viewport.width === 1440) {
-          // Opened, it spans the card below the chart, so the bucket table gets the full width.
-          // Boxes are viewport-relative and opening can scroll, so both are measured afresh.
-          const d = await details.boundingBox();
-          const c2 = await chart.boundingBox();
-          if (d === null || c2 === null) throw new Error('missing disclosure box');
-          expect(d.y).toBeGreaterThanOrEqual(c2.y + c2.height);
-          expect(d.width).toBeGreaterThan(c2.width);
-        }
+        // Opened, it sits below the chart. Boxes are viewport-relative and opening can scroll,
+        // so both are measured afresh.
+        const d = await details.boundingBox();
+        const c2 = await chart.boundingBox();
+        if (d === null || c2 === null) throw new Error('missing disclosure box');
+        expect(d.y).toBeGreaterThanOrEqual(c2.y + c2.height);
         const overflow = await page.evaluate('document.documentElement.scrollWidth - window.innerWidth');
         expect(overflow).toBeLessThanOrEqual(0);
       });
