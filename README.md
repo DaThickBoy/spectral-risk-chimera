@@ -8,7 +8,7 @@ The dashboard shows portfolio value, allocation, currency exposure, and the scen
 
 Prices and histories are synthetic DEMO fixtures. The replay uses a fixed reference time and a recorded ECB response. Base VaR models one-day asset-price changes with FX held fixed. Synthetic sentiment does not affect risk, Adjusted VaR remains unavailable under OD-1, and SEC filing analysis is unconfigured.
 
-- [Public demo](https://dathickboy.github.io/spectral-risk-chimera/) — static recorded replay, no backend. A newer dashboard (light theme per approved steering decision D1) has passed local validation and awaits owner-approved release. **Parity between the public site and the current branch is not verified**: the newest discovered public deployment was reported as built from commit `3234dab`, while the audited branch HEAD is `75ce8d6`. See [release verification](docs/evidence/release-verification.md).
+- [Public demo](https://dathickboy.github.io/spectral-risk-chimera/) — static recorded replay, no backend. The five-view dashboard was merged (`df0ea19`) and deployed on 2026-11-22; signed-out public acceptance passed and all four served replay hashes match the approved baseline. Compiled frontend byte parity was verified on 2026-11-23 by a clean rebuild of the merge-commit source. See [release verification](docs/evidence/release-verification.md).
 - [Kiro usage and later contributions](docs/kiro-usage.md)
 - [Devpost draft](docs/devpost-submission.md)
 - [Video script and shot list](docs/demo-script.md)
