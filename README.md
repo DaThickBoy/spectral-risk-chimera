@@ -8,8 +8,8 @@ The dashboard shows portfolio value, allocation, currency exposure, and the scen
 
 Prices and histories are synthetic DEMO fixtures. The replay uses a fixed reference time and a recorded ECB response. Base VaR models one-day asset-price changes with FX held fixed. Synthetic sentiment does not affect risk, Adjusted VaR remains unavailable under OD-1, and SEC filing analysis is unconfigured.
 
-- [Public demo](https://dathickboy.github.io/spectral-risk-chimera/) — static recorded replay. The dark redesign has been verified locally and awaits release approval. On November 11, 2026, the public site served the earlier interface with identical replay files.
-- [Kiro and Codex contributions](docs/kiro-usage.md)
+- [Public demo](https://dathickboy.github.io/spectral-risk-chimera/) — static recorded replay, no backend. A newer dashboard (light theme per approved steering decision D1) has passed local validation and awaits owner-approved release. **Parity between the public site and the current branch is not verified**: the newest discovered public deployment was reported as built from commit `3234dab`, while the audited branch HEAD is `75ce8d6`. See [release verification](docs/evidence/release-verification.md).
+- [Kiro usage and later contributions](docs/kiro-usage.md)
 - [Devpost draft](docs/devpost-submission.md)
 - [Video script and shot list](docs/demo-script.md)
 - [Submission checklist](docs/submission-checklist.md)
@@ -46,11 +46,17 @@ Financial values use decimal strings at API and storage boundaries. The dashboar
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **DEMO DATA**                                 | Prices and history are deterministic fixtures (`DEMO-EU`, `DEMO-US`, `DEMO-UK`, `DEMO-A`, `DEMO-B`), not market data. Every result is flagged `DEMO_DATA` and never alerts.                                                                                                                                                     |
 | **ECB statistics** (published versus derived) | FX comes from the ECB euro reference rates. The ECB publishes `EUR→X`. The application uses `X→EUR`, computed as `1 / published` at 40 significant digits, and labels that value **Derived**. The published value is shown separately. Source: ECB statistics. The reference rates are published for information purposes only. |
-| **RECORDED REPLAY**                           | The public site shows responses recorded from the real backend at a fixed reference time (2026-11-06 16:00 UTC), using the DEMO fixtures and one recorded ECB response. It is not live data.                                                                                                                                    |
+| **Recorded Replay · Not live**                | The public site shows responses recorded from the real backend at a fixed reference time (2026-11-06 16:00 UTC), using the DEMO fixtures and one recorded ECB response. Open the replay disclosure for source, timestamp, and recording details.                                                                                |
 
-## Reading the redesigned replay
+## Three ways to run it
 
-The local dark dashboard starts with the portfolio overview and freshness at replay time. The loss distribution and allocation follow, then currency exposure, positions, risk signals, and FX provenance. Allocation shows backend-reported position percentages and a separate cash amount.
+1. **Public static recorded replay** — [the GitHub Pages site](https://dathickboy.github.io/spectral-risk-chimera/). Static files only: two recorded portfolio views, a manifest, and one recorded ECB response. No backend, no write route, no live provider. Reproduce it locally with [Recorded replay](#recorded-replay-what-github-pages-serves) below.
+2. **Local live demo backend** — `npm start -- --demo-fixtures` (with the demo configuration and required flags; see [Run the demo backend](#run-the-demo-backend)). A real Fastify backend on loopback with DEMO fixture market data, a live ECB FX request, CSV import routes, and a read-only dashboard stream. Never exposed publicly.
+3. **Intentionally unavailable** — sentiment-adjusted VaR (no aggregation method approved, OD-1), SEC filing risk (not configured, decision H8), live market-data providers (OD-13), FIX import beyond a structural tokenizer, and production startup (OD-19). These surfaces explain their unavailability instead of showing a number. See [Limitations](#limitations-and-deferred-work-honest-list).
+
+## Reading the replay dashboard
+
+The dashboard starts with the portfolio overview and freshness at replay time. The loss distribution and allocation follow, then currency exposure, positions, risk signals, and FX provenance. Allocation shows backend-reported position percentages and a separate cash amount. The design follows the approved steering (`.kiro/steering/ui-guidelines.md`): a light canvas with white cards, deep navy sidebar and chart surfaces, and a categorical chart palette (blue/green/violet families) with numbered position badges so colour is never the only cue. The palette validation is recorded in [docs/evidence/palette-validation.md](docs/evidence/palette-validation.md).
 
 - **Base VaR** is a one-day, 95% historical-simulation estimate for asset-price changes with FX held fixed. The histogram shows the same 250 scenario losses in 20 equal-width buckets. The dashed marker locates the raw quantile. Thirteen scenarios exceed the marker in each recorded portfolio. The orange marker bucket also contains observations below the marker.
 - **Adjusted VaR** shows unavailable because no sentiment aggregation method is approved under OD-1.
@@ -68,7 +74,7 @@ npm run build
 
 ### Run the demo backend
 
-The demo uses the committed demo configuration `config/demo/kiroween-2026.demo.jsonc`. Its provisional values are approved for the hackathon demo only. It needs a database file path. Environment variables are read from the shell; a `.env` file is not loaded.
+This is the **local live demo** (option 2 above), not what GitHub Pages serves. The demo uses the committed demo configuration `config/demo/kiroween-2026.demo.jsonc`. Its provisional values are approved for the hackathon demo only. It needs a database file path. Environment variables are read from the shell; a `.env` file is not loaded.
 
 PowerShell:
 
@@ -88,9 +94,26 @@ SRC_CONFIG_FILE=config/demo/kiroween-2026.demo.jsonc SRC_DATABASE_FILE=/tmp/src-
 - **Binding and startup:** the server binds to `127.0.0.1` only. Without `--demo-fixtures` it refuses to start (`PROVIDERS_NOT_CONFIGURED`), and the demo configuration is refused outside demo mode.
 - **Seeding:** at startup it seeds two portfolios: `demo-eur-usd-gbp` (EUR, USD, and GBP holdings, EUR base) and `demo-eur-only`.
 - **Live ECB request:** in this live local mode the backend requests the current rates from the ECB API. If the ECB is unreachable or the rate is stale, the multi-currency portfolio shows _FX UNAVAILABLE_ or _STALE_, and the EUR-only portfolio still calculates.
-- **Read-only endpoints:** `GET /dashboard` and `GET /dashboard/portfolios/<id>`.
+- **Read-only dashboard endpoints:** `GET /dashboard` and `GET /dashboard/portfolios/<id>`.
+- **Local write routes (not on the public site):** `POST /portfolios` (JSON `{ "id", "base_currency", "cash" }`) and `POST /portfolios/:id/imports` (one multipart CSV file part; optional `?source=` label and column-mapping query fields). Re-importing the same file reports duplicates instead of double-counting; see [import deduplication](docs/import-deduplication.md). These routes require the matching `Origin` header (below). The dashboard UI itself is read-only; imports go through the API.
 - **Request guard:** the backend accepts only a `Host` of `127.0.0.1:<port>` or `localhost:<port>` for its own port, which blocks DNS rebinding. `POST`, `PUT`, `PATCH`, and `DELETE` also need an `Origin` that exactly matches an `--allowed-origin` value, which blocks cross-site writes. A script that writes to the local API must send that `Origin` header. This is not authentication (OD-7 is still open).
 - **Stopping:** stop with Ctrl+C.
+
+#### Optional: import a CSV into the local backend
+
+Local demo only — the public replay has no import route. With the backend running on port 8080, create a portfolio and upload one CSV file. The example uses the committed fixture `test/fixtures/csv/valid-basic.csv`: its `AAA` buy is accepted (and shows `PRICE_UNAVAILABLE`, because the DEMO fixtures only price `DEMO-*` tickers), while its `BBB` sell is quarantined as `OVERSELL` under the demo's `REJECT` policy — a rejection you can inspect at `GET /imports/<id>/rejections`:
+
+```bash
+curl -X POST http://127.0.0.1:8080/portfolios \
+  -H "Origin: http://127.0.0.1:5173" -H "Content-Type: application/json" \
+  -d '{"id":"my-demo","base_currency":"EUR","cash":"1000"}'
+
+curl -X POST "http://127.0.0.1:8080/portfolios/my-demo/imports?source=manual" \
+  -H "Origin: http://127.0.0.1:5173" \
+  -F "file=@test/fixtures/csv/valid-basic.csv"
+```
+
+The response is the stored import summary (accepted, rejected, duplicates, skipped). Importing the same file again reports duplicates, not new transactions. To import the seeded instruments instead, use rows with tickers `DEMO-EU`, `DEMO-US`, `DEMO-UK`, `DEMO-A`, or `DEMO-B` and matching currencies.
 
 ### Dashboard against the local backend
 
@@ -112,7 +135,7 @@ npm run export:replay   # records dist/web/replay/ deterministically; no live pr
 npm run serve:pages     # serves dist/web at http://127.0.0.1:4173/spectral-risk-chimera/
 ```
 
-Two exports from the same inputs produce byte-identical files. The manifest (`dist/web/replay/manifest.json`) records:
+This builds the local candidate using the Pages build procedure; it does not verify the deployed files. Deployment happens only through `.github/workflows/pages.yml` (push to `main` or manual `workflow_dispatch`) and requires owner approval; it must not be triggered by an agent. Two exports from the same inputs produce byte-identical files. The manifest (`dist/web/replay/manifest.json`) records:
 
 - the reference clock and dates;
 - the data mode (`DEMO`) and `live: false`;
@@ -131,6 +154,8 @@ Two exports from the same inputs produce byte-identical files. The manifest (`di
 | `npm run build`         | `tsc` backend build and the Vite dashboard build                                                                                                               |
 | `npm run export:replay` | Records the static replay                                                                                                                                      |
 | `npm run test:e2e`      | Playwright (Chromium) against the built replay under the Pages subpath. Run `npx playwright install chromium` once, and run `build` and `export:replay` first. |
+
+Baseline at commit `75ce8d6` (2026-11-21): all checks above passed; Vitest reported **3794 passed, 1 skipped** across 161 files, and the Playwright static-replay suite reported **49 passed** (Chromium). These counts change as the redesign lands; re-run the commands for the current numbers.
 
 CI (`.github/workflows/ci.yml`) runs these on Node.js 24.22.1 and 26, together with a pinned secret scan (gitleaks over the repository and, with `.gitleaks-bundle.toml`, over the built `dist/web` bundle that GitHub Pages publishes), `npm audit --audit-level=high`, and the browser tests. `npm audit` reports existing moderate, development-only findings; see [SECURITY.md](SECURITY.md).
 
@@ -177,6 +202,8 @@ test/           unit, property, integration, web, e2e, fixtures (recorded ECB re
 - **FX.** The ECB is approved for the hackathon demo only (OD-5 stays open for real use). The replay uses one recorded ECB response. With the demo's four-day freshness threshold, ECB rates are stale over the Easter closure.
 - **Adjusted VaR.** Unavailable until a sentiment aggregation method is approved (OD-1).
 - **SEC filing risk.** Not connected; no filing score is shown or fabricated.
+- **FIX import.** A structural FIX tokenizer exists, but FIX message processing is blocked (OD-9, supported message set undecided) and outside the demo scope; CSV is the working ingestion path.
+- **Live sentiment.** The demo shows invented, display-only DEMO observations; no live sentiment provider is polled.
 - **Holiday calendar.** Weekends only (OD-3).
 - **Production mode.** Undefined (OD-19); production startup is blocked.
 - **No authentication** (OD-7). The backend binds to loopback only and must not be exposed publicly. The public demo is a static replay with no backend.

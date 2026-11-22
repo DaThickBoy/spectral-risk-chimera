@@ -12,6 +12,8 @@ import type { LiveUpdateFactory, LiveUpdateHooks, StreamSocket } from '../../src
 import type { Loaded } from '../../src/web/data/source.js';
 import type { DashboardViewResponse } from '../../src/shared/apiContracts/index.js';
 import { demoIndex, multiCurrencyView } from './fixtures.js';
+import { viewHref } from '../../src/web/router.ts';
+import type { ViewId } from '../../src/web/router.ts';
 import { memorySource, render, settle, text } from './render.js';
 import type { Rendered } from './render.js';
 
@@ -77,7 +79,9 @@ async function show(options: {
   readonly kind: 'LIVE' | 'REPLAY';
   readonly live?: Live;
   readonly view?: () => Promise<Loaded<DashboardViewResponse>>;
+  readonly route?: ViewId;
 }): Promise<{ rendered: Rendered; viewCalls: () => number }> {
+  window.history.replaceState(null, '', viewHref(options.route ?? 'overview'));
   let calls = 0;
   const rendered = await render(
     <App
@@ -114,7 +118,7 @@ const sentiment = (ticker: string, value: string) => ({
 describe('task 17.4 in the dashboard (LIVE mode)', () => {
   it('a sentiment event updates only its ticker row, exactly as sent, without re-fetching the view', async () => {
     const live = fakeLive();
-    const { rendered, viewCalls } = await show({ kind: 'LIVE', live });
+    const { rendered, viewCalls } = await show({ kind: 'LIVE', live, route: 'signals' });
     const row = (t: string) =>
       rendered.container.querySelector(`[data-testid="sentiment-${t}"]`) as HTMLElement;
     const otherBefore = row('DEMO-EU');
@@ -143,6 +147,7 @@ describe('task 17.4 in the dashboard (LIVE mode)', () => {
     const { rendered } = await show({
       kind: 'LIVE',
       live,
+      route: 'signals',
       view: () => {
         if (first) {
           first = false;

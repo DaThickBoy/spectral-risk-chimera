@@ -10,7 +10,19 @@ import type { SourceInfo } from './data/source.js';
 import { codeLabel, confidencePct, utcText, withUnit } from './format.js';
 
 /** The section a step is shown above. */
-export type TourAnchor = 'summary' | 'charts' | 'panels';
+import type { ViewId } from './router.js';
+
+export type TourAnchor = 'summary' | 'allocation' | 'charts' | 'panels';
+
+export const tourView = (anchor: TourAnchor): ViewId =>
+  (
+    ({
+      summary: 'overview',
+      allocation: 'portfolio',
+      charts: 'risk',
+      panels: 'signals',
+    }) as const
+  )[anchor];
 
 export interface TourStep {
   readonly anchor: TourAnchor;
@@ -66,10 +78,10 @@ function baseVarStep(data: DashboardViewResponse): TourStep {
 }
 
 const CHARTS_STEP: TourStep = {
-  anchor: 'charts',
+  anchor: 'allocation',
   title: 'Allocation and currency exposure',
   body: [
-    "Each numbered segment of the allocation ring is a position's share as reported by the backend, on a fixed 0–100 % axis. Any unfilled part is not a listed position.",
+    "The ring or ranked bars show each position's allocation as reported by the backend. Positions without an allocation are not plotted.",
     "Further down, the currency exposure bars run from 0 to the backend's gross exposure. An outlined bar is a negative value.",
     'The bars are a visual aid. The exact values are in the tables next to them.',
   ],

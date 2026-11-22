@@ -1,0 +1,223 @@
+.workspace .page-header,
+.workspace > main,
+.workspace-preview {
+  min-width: 0;
+}
+
+.workspace .workspace-sidebar {
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  overflow-wrap: anywhere;
+}
+
+.workspace .workspace-sidebar .brand-name {
+  margin: 0;
+}
+
+.workspace .workspace-sidebar button {
+  color: var(--sidebar-text);
+  background: transparent;
+  border-color: var(--sidebar-border);
+  min-height: 44px;
+}
+
+.workspace .workspace-menu-toggle {
+  display: none;
+}
+
+.workspace .sidebar-nav {
+  grid-column: 1 / -1;
+}
+
+.workspace .sidebar-nav a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+
+.workspace .sidebar-nav a[aria-current='page'] {
+  color: var(--sidebar-text);
+  background: var(--sidebar-border);
+  font-weight: 700;
+}
+
+.workspace .workspace-nav-icon {
+  min-width: 1.2em;
+  text-align: center;
+}
+
+.workspace-preview > a {
+  display: inline-block;
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+@media (min-width: 1024px) {
+  .app.workspace {
+    max-width: 1800px;
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 1fr);
+    transition: grid-template-columns var(--transition-fast);
+    column-gap: var(--space-4);
+    grid-template-rows: auto 1fr;
+  }
+
+  .workspace .workspace-sidebar {
+    grid-row: 1 / span 2;
+    grid-column: 1;
+    align-content: start;
+    margin: 0;
+  }
+
+  .workspace .page-header,
+  .workspace > main {
+    grid-column: 2;
+  }
+
+  .workspace .sidebar-nav ul {
+    display: grid;
+  }
+
+  .workspace .topbar-facts {
+    display: grid;
+    grid-row: 3;
+  }
+
+  .workspace .replay-note {
+    grid-row: 4;
+  }
+
+  .app.workspace[data-sidebar-collapsed='true'] {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+  }
+
+  .workspace[data-sidebar-collapsed='true'] .workspace-sidebar {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: var(--space-2);
+    justify-items: stretch;
+  }
+
+  .workspace[data-sidebar-collapsed='true'] .sidebar-nav a {
+    justify-content: center;
+  }
+
+  .workspace[data-sidebar-collapsed='true'] :is(.brand, .workspace-nav-label) {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .workspace .workspace-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+  }
+  .workspace .workspace-collapse {
+    display: none;
+  }
+  .workspace .workspace-sidebar[data-menu-open='false'] .sidebar-nav {
+    display: none;
+  }
+  .workspace .workspace-sidebar .sidebar-nav ul {
+    padding: 0;
+  }
+  .workspace .workspace-sidebar {
+    margin-bottom: var(--space-2);
+  }
+
+  /* Phone first screen: both headline figures (NAV and Base VaR) must be visible without
+     scrolling. The shell keeps every provenance fact — data mode, source, recording time,
+     run mode, and the replay note — but lays the facts out inline and tightens the chrome
+     so the two full-width KPI cards fit above the fold at 390×844 and 320×844. */
+  .workspace .topbar {
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-2);
+  }
+
+  .workspace .topbar-facts {
+    gap: 2px var(--space-4);
+  }
+
+  .workspace .topbar-facts > div {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-1);
+  }
+
+  .workspace .replay-note {
+    font-size: var(--size-label);
+  }
+
+  .workspace .page-header {
+    gap: var(--space-1);
+    padding-bottom: var(--space-1);
+  }
+
+  .workspace .page-header .topbar-controls {
+    gap: var(--space-1);
+  }
+
+  .workspace .page-subtitle {
+    margin: 0;
+    font-size: var(--size-label);
+  }
+}
+
+.workspace-provenance {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border-top: 1px solid var(--sidebar-border);
+  padding-block: 0.5rem;
+}
+.workspace-provenance summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.workspace .sidebar-nav a[aria-current='page'] {
+  box-shadow: inset 3px 0 #7d9cff;
+}
+.kpi-unit {
+  font-size: 0.48em;
+  letter-spacing: 0.035em;
+}
+.panels {
+  align-items: start;
+}
+.fx-rate-kind {
+  display: block;
+  margin-block-start: 0.35rem;
+  font-weight: 650;
+}
+.fx-steps {
+  color: var(--color-text-secondary);
+  font-size: var(--size-small);
+}
+@media (min-width: 1024px) {
+  .workspace .sidebar-nav {
+    grid-row: 2;
+  }
+  .workspace-provenance {
+    grid-row: 3;
+  }
+  .workspace[data-sidebar-collapsed='true'] .workspace-provenance {
+    overflow-wrap: anywhere;
+  }
+  .workspace .overview-kpis {
+    grid-template-columns: 1.4fr 1.35fr 1fr 0.75fr;
+  }
+  .workspace .panels {
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  }
+  .workspace .viz-allocation .allocation-composition {
+    grid-template-columns: minmax(130px, 12rem) minmax(0, 24rem);
+  }
+  .workspace .workspace-preview .allocation-composition {
+    grid-template-columns: minmax(100px, 8rem) minmax(0, 1fr);
+  }
+}
+
+.site-footer {
+  max-width: 1800px;
+  margin-inline: auto;
+}

@@ -8,6 +8,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../../src/web/App.tsx';
 import { Help } from '../../src/web/components/Help.tsx';
 import { GLOSSARY } from '../../src/web/glossary.ts';
+import { viewHref } from '../../src/web/router.ts';
+import type { ViewId } from '../../src/web/router.ts';
 import { demoIndex, multiCurrencyView } from './fixtures.js';
 import { memorySource, render } from './render.js';
 import type { Rendered } from './render.js';
@@ -15,6 +17,7 @@ import type { Rendered } from './render.js';
 const mounted: Rendered[] = [];
 afterEach(() => {
   for (const r of mounted.splice(0)) r.unmount();
+  window.history.replaceState(null, '', window.location.pathname + window.location.search);
 });
 
 async function mount(element: Parameters<typeof render>[0]): Promise<Rendered> {
@@ -135,7 +138,15 @@ describe('glossary content', () => {
 });
 
 describe('Help placement in the dashboard', () => {
-  async function dashboard(): Promise<Rendered> {
+  const termsByRoute = {
+    overview: ['nav', 'baseVar', 'exposure', 'states', 'lossDistribution'],
+    risk: ['lossDistribution'],
+    portfolio: ['currencyExposure'],
+    signals: ['confidence', 'rawQuantile', 'adjustedVar'],
+  } as const;
+
+  async function dashboard(route: ViewId): Promise<Rendered> {
+    window.history.replaceState(null, '', viewHref(route));
     return mount(
       <App
         source={memorySource({
@@ -146,45 +157,52 @@ describe('Help placement in the dashboard', () => {
     );
   }
 
-  it('renders one trigger for every glossary term, outside headings', async () => {
-    const { container } = await dashboard();
-    for (const term of Object.keys(GLOSSARY)) {
-      const b = button(container, term);
-      expect(b.closest('h1, h2, h3')).toBeNull();
-      expect(container.querySelectorAll(`[data-testid="help-${term}"]`)).toHaveLength(1);
+  it('renders every glossary term on its assigned view, once per view and outside headings', async () => {
+    expect([...new Set(Object.values(termsByRoute).flat())].sort()).toEqual(Object.keys(GLOSSARY).sort());
+    for (const route of Object.keys(termsByRoute) as (keyof typeof termsByRoute)[]) {
+      const { container } = await dashboard(route);
+      const triggers = [...container.querySelectorAll('button[data-testid^="help-"]')];
+      expect(triggers.map((b) => b.getAttribute('data-testid')).sort()).toEqual(
+        termsByRoute[route].map((term) => `help-${term}`).sort(),
+      );
+      for (const b of triggers) expect(b.closest('h1, h2, h3')).toBeNull();
     }
   });
 
   it('places triggers next to their labels', async () => {
-    const { container } = await dashboard();
+    const { container } = await dashboard('overview');
     const summary = container.querySelector('[data-testid="summary"]') as HTMLElement;
     for (const term of ['nav', 'baseVar', 'exposure', 'states'])
       expect(summary.contains(button(container, term))).toBe(true);
-    const baseVarPanel = container.querySelector('#base-var-title')?.closest('section') as HTMLElement;
-    expect(baseVarPanel.contains(button(container, 'confidence'))).toBe(true);
-    expect(baseVarPanel.contains(button(container, 'rawQuantile'))).toBe(true);
-    const adjusted = container.querySelector('#adjusted-var-title')?.closest('section') as HTMLElement;
-    expect(adjusted.contains(button(container, 'adjustedVar'))).toBe(true);
+    const { container: signals } = await dashboard('signals');
+    const baseVarPanel = signals.querySelector('#base-var-title')?.closest('section') as HTMLElement;
+    expect(baseVarPanel.contains(button(signals, 'confidence'))).toBe(true);
+    expect(baseVarPanel.contains(button(signals, 'rawQuantile'))).toBe(true);
+    const adjusted = signals.querySelector('#adjusted-var-title')?.closest('section') as HTMLElement;
+    expect(adjusted.contains(button(signals, 'adjustedVar'))).toBe(true);
     expect(
       container.querySelector('[data-testid="loss-badges"]')?.contains(button(container, 'lossDistribution')),
     ).toBe(true);
+    const { container: portfolio } = await dashboard('portfolio');
     expect(
-      container.querySelector('[data-testid="ccy-badges"]')?.contains(button(container, 'currencyExposure')),
+      portfolio.querySelector('[data-testid="ccy-badges"]')?.contains(button(portfolio, 'currencyExposure')),
     ).toBe(true);
   });
 
   it('opening a panel leaves the metric values unchanged and visible', async () => {
-    const { container } = await dashboard();
+    const { container } = await dashboard('signals');
     await click(button(container, 'adjustedVar'));
     await click(button(container, 'confidence'));
     expect(container.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('124.10 EUR');
     expect(container.querySelector('[data-testid="adjusted-var-value"]')?.textContent).toBe('Unavailable');
   });
 
-  it('axe-core finds no violations with help panels open', async () => {
-    const { container } = await dashboard();
-    for (const term of ['nav', 'adjustedVar', 'states', 'lossDistribution'])
-      await click(button(container, term));
+  it.each([
+    ['overview', ['nav', 'states', 'lossDistribution']],
+    ['signals', ['adjustedVar']],
+  ] as const)('axe-core finds no violations on %s with help panels open', async (route, terms) => {
+    const { container } = await dashboard(route);
+    for (const term of terms) await click(button(container, term));
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
   });

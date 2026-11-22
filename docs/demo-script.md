@@ -1,70 +1,77 @@
 # Kiroween demo video
 
-Target cut **2:40**. The narration has **309 words**. At 130–140 words per minute it takes about **2:12–2:23**, leaving **17–28 seconds** for pauses and transitions. This is an estimate. Rehearse the timed cut before publishing and trim it to 2:45 or less.
+Target cut **2:40–2:45**, under the three-minute limit. The narration below is **355 words**; at 130–140 words per minute that is roughly **2:32–2:44** of speech alone. This is an estimate. Rehearse the timed cut, speak toward the faster end, keep transitions tight, and trim narration as needed so the finished video is 2:45 or less.
 
-Use the verified dark dashboard in the local replay preview. Keep “Local preview · recorded DEMO replay” visible while the redesign is local. The [public demo](https://dathickboy.github.io/spectral-risk-chimera/) currently serves the earlier interface with the same replay data. Before publishing the final video, confirm that the submitted application matches the version shown. The [README](../README.md#recorded-replay-what-github-pages-serves) explains how to open the local replay.
+## What to record, and where
 
-Use prepared cuts for the code and manifest shots. Show the existing files without starting a provider request or regenerating the replay. The manifest identifies recorded files by hash. Snapshot recomputation is a separate backend capability.
+Record the dashboard in the **local replay preview** of the release candidate (`npm run build && npm run export:replay && npm run serve:pages`, then open `http://127.0.0.1:4173/spectral-risk-chimera/`; see the [README](../README.md#recorded-replay-what-github-pages-serves)). Keep **Recorded Replay · Not live** and the demo notice in frame. Open the replay disclosure to show the source, recording timestamp, and details.
+
+The [public site](https://dathickboy.github.io/spectral-risk-chimera/) has not been verified against the current candidate (see [release verification](evidence/release-verification.md)). Before publishing the video, the owner must approve the release and confirm the public URL shows the same version the video demonstrates. Do not present the local preview as the public site.
+
+The five-view release candidate passed local validation. Recheck every figure against the actual replay before the final cut.
+
+Use prepared cuts for the code, spec, and manifest shots. Show existing files; do not start a provider request or regenerate the replay on camera. The manifest identifies recorded files by SHA-256. Snapshot recomputation is a separate local-backend capability, not something the public replay does.
+
+**Optional local-import insert.** If you show CSV import, record it only against the **local live demo backend** (`npm start -- --demo-fixtures`, see [README](../README.md#optional-import-a-csv-into-the-local-backend)), and label the shot clearly, e.g. an overlay reading "LOCAL demo backend — not the public replay". The dashboard UI is read-only; imports go through the API (`POST /portfolios/:id/imports`), so show the terminal command and the returned import summary, then the dashboard reflecting the change. If time is tight, cut this insert first — the replay already shows the seeded CSV lineage.
 
 ## Shot list and narration
 
-### 0:00–0:14
+### 0:00–0:14 — Problem framing
 
-**Shot** — Start on the multi-currency overview with NAV and Base VaR visible. Overlay the project name and Frankenstein category.
+**Shot** — Cold open on the multi-currency overview with NAV and Base VaR visible. Overlay the project name and the Frankenstein category.
 
 > Where did this portfolio risk figure come from? Spectral Risk Chimera lets a reviewer follow the holdings, currency conversion, and scenarios behind the number.
 
-### 0:14–0:35
+### 0:14–0:36 — Portfolio overview and recorded-demo transparency
 
-**Shot** — Point to DEMO DATA, RECORDED REPLAY, the fixed timestamp, portfolio selector, and NAV.
+**Shot** — Point to **Recorded Replay · Not live** and the demo notice, open the replay disclosure to show the timestamp and source, then show the portfolio selector, NAV, and the Base VaR tile with its methodology line (historical simulation, 95%, one day).
 
-> This is a recorded demo at a fixed November sixth reference time. Prices and histories are synthetic fixtures. The portfolio holds euro, dollar, and sterling instruments, with a euro net asset value of twenty-two thousand, three hundred seventy-five euros and seventy-four cents.
+> This is a recorded demo at a fixed November sixth reference time, not live data; prices and histories are synthetic fixtures. The portfolio holds euro, dollar, and sterling instruments plus cash. Net asset value: twenty-two thousand, three hundred seventy-five euros and seventy-four cents. Base VaR: one hundred twenty-four euros and ten cents.
 
-### 0:35–0:56
+### 0:36–1:04 — Frankenstein data lineage
 
-**Shot** — Show the seed CSV construction in [demoPortfolios.ts](../src/main/demoPortfolios.ts). Cut to Positions and allocation, then the published EUR→USD quote and derived inverse in FX rates used.
+**Shot** — Prepared cut of the seed CSV construction in [demoPortfolios.ts](../src/main/demoPortfolios.ts) (the import use case runs on fixed CSV rows). Cut back to Positions and allocation, then to FX rates used: the published EUR→USD quote beside the derived inverse, labelled derived.
 
-> The holdings begin as validated CSV transactions in a ledger. Positions are rebuilt from that ledger. Here, the recorded ECB quote is one point one one six five dollars per euro. Its inverse converts dollar holdings into euros, and is labeled derived.
+> The Frankenstein build stitches separate systems together. Holdings begin as validated CSV transactions in a persisted ledger. The recorded ECB quote is one point one one six five dollars per euro; its inverse converts dollar holdings into euros and is labeled derived, never published. Aligned historical returns become loss scenarios, and the scenarios become an explainable VaR. Every stage keeps its evidence.
 
-### 0:56–1:21
+### 1:04–1:30 — Loss-distribution inspection
 
-**Shot** — Frame Base VaR and its fixed-FX disclosure. Show the histogram, dashed raw quantile marker, orange bucket legend, and 13-of-250 summary.
+**Shot** — The loss histogram: dashed raw-quantile marker, orange marker bucket with its text legend, the 13-of-250 exceedance summary. Open the exact-value disclosure table and scroll it briefly. Point out that the marker bucket's count (31) is not the exceedance count.
 
-> Base VaR is one hundred twenty-four euros and ten cents. It uses historical simulation at ninety-five percent confidence for a one-day asset-price horizon, with FX held fixed. These twenty buckets contain two hundred fifty scenarios. Thirteen exceed the marker. The orange marker bucket also contains scenarios below that threshold.
+> Base VaR uses historical simulation at ninety-five percent confidence, a one-day asset-price horizon, FX held fixed. Twenty buckets hold two hundred fifty scenarios; thirteen exceed the raw quantile marker. The exact values are in this table, from the backend. The orange marker bucket also holds losses below the marker, so its count differs — the dashboard reports both.
 
-### 1:21–1:40
+### 1:30–1:48 — Honest limits
 
-**Shot** — Show the allocation legend with holding values and cash. Move to the currency exposure bars and their EUR units.
+**Shot** — The Market Sentiment panel with DEMO OBSERVATION labels, Adjusted VaR marked unavailable with the OD-1 reason, SEC Filing Risk marked not configured.
 
-> Allocation shows each holding’s reported share and value, with one thousand euros of cash identified separately. Currency bars show instrument-currency exposure valued in euros. They describe the holdings; currency shocks are excluded from this VaR.
+> The limits stay visible. Sentiment values are labeled demo observations and do not affect risk. Adjusted VaR is unavailable: no aggregation method is approved. SEC filing analysis is not configured. Each panel explains itself instead of falling back to another number.
 
-### 1:40–1:59
+### 1:48–2:05 — Second portfolio and reproducible replay
 
-**Shot** — Show DEMO OBSERVATION and its explanation, the OD-1 reason for unavailable Adjusted VaR, and SEC Filing Risk marked unconfigured.
+**Shot** — Switch to `demo-eur-only`; show NAV 14025.44 EUR and Base VaR 140.18 EUR. Prepared cut of the local `dist/web/replay/manifest.json`: reference clock, DEMO mode, `live: false`, per-file SHA-256 hashes.
 
-> Sentiment values are labeled demo observations and do not affect risk. Adjusted VaR remains unavailable because sentiment aggregation is unresolved. SEC filing analysis is also unconfigured. Each limitation stays visible beside the relevant panel.
+> A second, euro-only portfolio needs no FX. The replay manifest records the reference clock, demo mode, and a hash for every file; two exports from the same inputs are byte-identical. A reviewer can verify exactly what they are looking at.
 
-### 1:59–2:18
+### 2:05–2:28 — One authentic Kiro decision
 
-**Shot** — Switch to `demo-eur-only` and show 140.18 EUR Base VaR. Cut to the [replay manifest](https://dathickboy.github.io/spectral-risk-chimera/replay/manifest.json), showing the clock, DEMO mode, and per-view hashes.
+**Shot** — The tracked `.kiro/specs/` and `.kiro/steering/` directories. Prepared cut of the signed-zero regression evidence: the [Kiro evidence packet, example 3](evidence/kiro-evidence.md#3-signed-zero-histogram-ci-regression) and commit `1d0c159`. Show only excerpts the owner has cleared for sharing; the full transcript is owner-supplied and kept outside the repository. If no excerpt is cleared, show the repository artifacts and the commit alone.
 
-> Switching portfolios shows the euro-only example. The replay manifest records the reference clock, demo mode, and file hashes. The backend also stores calculation snapshots for recomputation. Together, these connect ingestion, FX provenance, scenario calculations, and reproducible presentation.
+> The foundation was built spec-first with Kiro: requirements, design, tasks, and financial steering, tracked in the repository. One real example: CI caught a negative-zero histogram index. Kiro traced it, normalized the index, and added a regression test replaying the exact failing seed. Later dashboard and review work used other AI assistance, documented separately.
 
-### 2:18–2:35
+### 2:28–2:42 — Closing and honest future work
 
-**Shot** — Show the tracked `.kiro/specs/` and `.kiro/steering/` directories. If the owner clears an excerpt for sharing, show the signed-zero regression from the [Kiro evidence packet](evidence/kiro-evidence.md#3-signed-zero-histogram-ci-regression). Credit the later Codex work.
+**Shot** — End card: project name, repository URL, application URL, MIT license, "Recorded DEMO replay". Start the closing line as the card appears; hold the card for the last second.
 
-> The Kiro project folder contains requirements, design, tasks, and financial steering. The later dashboard redesign, review, and test updates used Codex. This Frankenstein entry brings those data and calculation workflows into one inspectable application.
+> Next: approved sentiment aggregation, live providers, production hardening — open decisions, not promises. Spectral Risk Chimera: follow the number from its inputs to its limits.
 
-### 2:35–2:42
+## Capture checklist
 
-**Shot** — End card with project name, repository, application URL, MIT license, and “Recorded DEMO replay.” Start the closing line as the card appears, allow six seconds for delivery, then hold the card for one second.
-
-> Spectral Risk Chimera. Follow the number from its inputs to its limits.
-
-## Recording checks
-
-- [ ] Match the shown figures and disclosures to the actual replay.
-- [ ] Rehearse and time the finished cut, including transitions and the end card.
+- [ ] Release candidate confirmed stable by the lead engineer; local replay rebuilt (`npm run build && npm run export:replay`) from the exact release commit.
+- [ ] Every shown figure matches the actual replay: NAV 22375.74 / Base VaR 124.10 (`demo-eur-usd-gbp`), NAV 14025.44 / Base VaR 140.18 (`demo-eur-only`), 13 of 250 exceedances, published EUR→USD 1.1165, cash 1000.00 EUR.
+- [ ] Keep the persistent replay status and demo notice in frame where possible; show the expanded replay disclosure in the opening shot.
+- [ ] Any local-backend import shot carries the "LOCAL demo backend" overlay and is visually distinct from the replay.
+- [ ] Kiro shot uses only owner-cleared excerpts or repository artifacts; no fabricated transcripts.
+- [ ] Owner has approved the release; the public URL shows the same version as the video (see [release verification](evidence/release-verification.md)).
+- [ ] Rehearse and time the finished cut, including transitions and the end card: 2:45 or less.
 - [ ] Use only media you are authorized to include.
-- [ ] Check the public YouTube link signed out and add it to the Devpost form.
+- [ ] Owner publishes the video as Public on YouTube, checks it signed out, and adds the URL to the Devpost form. No URL exists yet; do not invent one.

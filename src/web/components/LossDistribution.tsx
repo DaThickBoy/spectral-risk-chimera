@@ -1,7 +1,7 @@
 // Loss distribution of the Base VaR scenarios (Kiroween decision A2; ui-guidelines 5).
 // Every value is backend text: exact canonical decimals in the table and tooltips, backend
 // display strings on the axis. Geometry comes from the chart adapter; nothing is calculated here.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactElement, RefObject } from 'react';
 import type { DashboardViewResponse } from '../../shared/apiContracts/index.js';
 import { histogramPlot } from '../chartAdapter.js';
@@ -9,6 +9,8 @@ import type { AvailableLossDistribution, ChartFrame } from '../chartAdapter.js';
 import { MISSING, codeLabel, confidencePct, utcText, withUnit } from '../format.js';
 import { Badge, toneOf } from './Badge.tsx';
 import { Help } from './Help.tsx';
+
+import './lossDistribution.css';
 
 type View = DashboardViewResponse;
 
@@ -53,10 +55,18 @@ const rangeText = (bucket: AvailableLossDistribution['buckets'][number], currenc
 function Chart(props: {
   readonly dist: AvailableLossDistribution;
   readonly containerWidth: number | null;
+  readonly overview: boolean;
 }): ReactElement {
-  const { dist, containerWidth } = props;
+  const { dist, containerWidth, overview } = props;
+  const id = useId();
+  const [selected, setSelected] = useState(dist.varMarker.bucketIndex);
+  const [hovered, setHovered] = useState<number | null>(null);
+  const active = hovered ?? selected;
+  const inspected = dist.buckets[active];
+  const committed = dist.buckets[selected];
   const compact = containerWidth !== null && containerWidth < COMPACT_BELOW_PX;
-  const frame = compact ? compactFrame(containerWidth) : FRAME;
+  const baseFrame = compact ? compactFrame(containerWidth) : FRAME;
+  const frame = overview ? { ...baseFrame, height: 230 } : baseFrame;
   const axisLabelX = compact ? 12 : 14; // pixel x of the rotated y-axis label
   const plot = histogramPlot(dist, frame);
   const currency = dist.currency;
@@ -64,113 +74,195 @@ function Chart(props: {
   const marker = `VaR ${confidence} · ${dist.varMarker.rawQuantileDisplay} ${currency}`;
   const first = dist.buckets[0];
   const last = dist.buckets.at(-1);
+  const slotWidth = (plot.plotRight - plot.plotLeft) / dist.bucketCount;
   return (
-    <svg
-      className={compact ? 'loss-chart loss-chart-compact' : 'loss-chart'}
-      viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
-      role="img"
-      aria-labelledby="loss-chart-title loss-chart-desc"
-      data-testid="loss-chart"
-    >
-      <title id="loss-chart-title">
-        Base VaR scenario losses, {String(dist.bucketCount)} buckets, {currency}
-      </title>
-      <desc id="loss-chart-desc">
-        {`${String(dist.scenarioCount)} scenarios. The VaR marker at ${confidence} is ${dist.varMarker.rawQuantile} ${currency}. Scenarios with a larger loss: ${String(dist.varMarker.scenariosAbove)}. The table below lists every bucket.`}
-      </desc>
-      {/* Gridline at the maximum count (existing plot geometry; no value is computed). */}
-      <line
-        className="chart-grid"
-        x1={plot.plotLeft}
-        x2={plot.plotRight}
-        y1={plot.plotTop}
-        y2={plot.plotTop}
-        aria-hidden="true"
-      />
-      {/* Axes */}
-      <line
-        className="chart-axis"
-        x1={plot.plotLeft}
-        x2={plot.plotRight}
-        y1={plot.plotBottom}
-        y2={plot.plotBottom}
-      />
-      <line
-        className="chart-axis"
-        x1={plot.plotLeft}
-        x2={plot.plotLeft}
-        y1={plot.plotTop}
-        y2={plot.plotBottom}
-      />
-      <text className="chart-tick" x={plot.plotLeft} dx={-6} y={plot.plotBottom} textAnchor="end">
-        0
-      </text>
-      <text className="chart-tick" x={plot.plotLeft} dx={-6} y={plot.plotTop} dy={4} textAnchor="end">
-        {String(plot.maxCount)}
-      </text>
-      <text className="chart-tick" x={plot.plotLeft} y={plot.plotBottom} dy={18} textAnchor="start">
-        {first === undefined ? MISSING : `${first.lowerDisplay} ${currency}`}
-      </text>
-      <text className="chart-tick" x={plot.plotRight} y={plot.plotBottom} dy={18} textAnchor="end">
-        {last === undefined ? MISSING : `${last.upperDisplay} ${currency}`}
-      </text>
-      <text className="chart-axis-label" x={plot.centerX} y={frame.height} dy={-8} textAnchor="middle">
-        Loss ({currency}); negative values are gains
-      </text>
-      <text
-        className="chart-axis-label"
-        x={axisLabelX}
-        y={plot.centerY}
-        textAnchor="middle"
-        transform={`rotate(-90 ${String(axisLabelX)} ${String(plot.centerY)})`}
+    <>
+      <svg
+        onPointerLeave={() => setHovered(null)}
+        onPointerCancel={() => setHovered(null)}
+        className={compact ? 'loss-chart loss-chart-compact' : 'loss-chart'}
+        viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
+        role="img"
+        aria-labelledby={`${id}-title ${id}-desc`}
+        data-testid="loss-chart"
       >
-        Scenarios (count)
-      </text>
-      {/* Bars: one per bucket; empty buckets are real zero counts. */}
-      {plot.bars.map((bar) => {
-        const bucket = dist.buckets[bar.index];
-        return bucket === undefined ? null : (
+        <title id={`${id}-title`}>
+          Base VaR scenario losses, {String(dist.bucketCount)} buckets, {currency}
+        </title>
+        <desc id={`${id}-desc`}>
+          {`${String(dist.scenarioCount)} scenarios. The VaR marker at ${confidence} is ${dist.varMarker.rawQuantile} ${currency}. Scenarios with a larger loss: ${String(dist.varMarker.scenariosAbove)}. ${overview ? 'Open Risk Analytics for the exact bucket table.' : 'The table below lists every bucket.'}`}
+        </desc>
+        {/* Gridline at the maximum count (existing plot geometry; no value is computed). */}
+        <line
+          className="chart-grid"
+          x1={plot.plotLeft}
+          x2={plot.plotRight}
+          y1={plot.plotTop}
+          y2={plot.plotTop}
+          aria-hidden="true"
+        />
+        {/* Axes */}
+        <line
+          className="chart-axis"
+          x1={plot.plotLeft}
+          x2={plot.plotRight}
+          y1={plot.plotBottom}
+          y2={plot.plotBottom}
+        />
+        <line
+          className="chart-axis"
+          x1={plot.plotLeft}
+          x2={plot.plotLeft}
+          y1={plot.plotTop}
+          y2={plot.plotBottom}
+        />
+        <text className="chart-tick" x={plot.plotLeft} dx={-6} y={plot.plotBottom} textAnchor="end">
+          0
+        </text>
+        <text className="chart-tick" x={plot.plotLeft} dx={-6} y={plot.plotTop} dy={4} textAnchor="end">
+          {String(plot.maxCount)}
+        </text>
+        <text className="chart-tick" x={plot.plotLeft} y={plot.plotBottom} dy={18} textAnchor="start">
+          {first === undefined ? MISSING : `${first.lowerDisplay} ${currency}`}
+        </text>
+        <text className="chart-tick" x={plot.plotRight} y={plot.plotBottom} dy={18} textAnchor="end">
+          {last === undefined ? MISSING : `${last.upperDisplay} ${currency}`}
+        </text>
+        <text className="chart-axis-label" x={plot.centerX} y={frame.height} dy={-8} textAnchor="middle">
+          Loss ({currency}); negative values are gains
+        </text>
+        <text
+          className="chart-axis-label"
+          x={axisLabelX}
+          y={plot.centerY}
+          textAnchor="middle"
+          transform={`rotate(-90 ${String(axisLabelX)} ${String(plot.centerY)})`}
+        >
+          Scenarios (count)
+        </text>
+        <rect
+          className="loss-active-slot"
+          x={plot.plotLeft + active * slotWidth}
+          y={plot.plotTop}
+          width={slotWidth}
+          height={plot.plotBottom - plot.plotTop}
+          aria-hidden="true"
+        />
+        {/* Bars: one per bucket; empty buckets are real zero counts. */}
+        {plot.bars.map((bar) => {
+          const bucket = dist.buckets[bar.index];
+          return bucket === undefined ? null : (
+            <rect
+              key={bar.index}
+              // Tail emphasis by the backend's integer bucket index (no money comparison): the
+              // bucket holding the VaR marker and every bucket beyond it.
+              className={bar.index >= dist.varMarker.bucketIndex ? 'chart-bar chart-bar-tail' : 'chart-bar'}
+              rx={2}
+              x={bar.x}
+              y={bar.y}
+              width={bar.width}
+              height={bar.height}
+              data-testid={`loss-bar-${String(bar.index)}`}
+            >
+              <title>{`${rangeText(bucket, currency)}: ${String(bucket.count)} scenarios`}</title>
+            </rect>
+          );
+        })}
+        {/* VaR marker at the raw Type 7 quantile, labelled with its confidence. */}
+        <line
+          className="chart-marker"
+          x1={plot.markerX}
+          x2={plot.markerX}
+          y1={plot.plotTop}
+          y2={plot.plotBottom}
+          data-testid="loss-var-marker"
+        >
+          <title>{`VaR ${confidence}: raw quantile ${dist.varMarker.rawQuantile} ${currency}`}</title>
+        </line>
+        <text
+          className="chart-marker-label"
+          x={plot.markerX}
+          y={plot.plotTop}
+          dx={plot.markerLabelAnchor === 'end' ? -4 : 4}
+          dy={-8}
+          textAnchor={plot.markerLabelAnchor}
+        >
+          {marker}
+        </text>
+        {plot.bars.map(({ index }) => (
           <rect
-            key={bar.index}
-            // Tail emphasis by the backend's integer bucket index (no money comparison): the
-            // bucket holding the VaR marker and every bucket beyond it.
-            className={bar.index >= dist.varMarker.bucketIndex ? 'chart-bar chart-bar-tail' : 'chart-bar'}
-            x={bar.x}
-            y={bar.y}
-            width={bar.width}
-            height={bar.height}
-            data-testid={`loss-bar-${String(bar.index)}`}
+            key={index}
+            className="loss-bucket-hit"
+            aria-hidden="true"
+            data-testid={`loss-hit-${String(index)}`}
+            x={plot.plotLeft + index * slotWidth}
+            y={plot.plotTop}
+            width={slotWidth}
+            height={plot.plotBottom - plot.plotTop}
+            onPointerEnter={(event) => {
+              if (event.pointerType !== 'touch') setHovered(index);
+            }}
+            onPointerLeave={() => setHovered(null)}
+            onClick={() => {
+              setHovered(null);
+              setSelected(index);
+            }}
+          />
+        ))}
+      </svg>
+      <div className="loss-inspector" data-testid="loss-inspector">
+        <label className="loss-inspector-control">
+          Inspect bucket
+          <select
+            value={selected}
+            onChange={(event) => {
+              setHovered(null);
+              setSelected(event.currentTarget.selectedIndex);
+            }}
           >
-            <title>{`${rangeText(bucket, currency)}: ${String(bucket.count)} scenarios`}</title>
-          </rect>
-        );
-      })}
-      {/* VaR marker at the raw Type 7 quantile, labelled with its confidence. */}
-      <line
-        className="chart-marker"
-        x1={plot.markerX}
-        x2={plot.markerX}
-        y1={plot.plotTop}
-        y2={plot.plotBottom}
-        data-testid="loss-var-marker"
-      >
-        <title>{`VaR ${confidence}: raw quantile ${dist.varMarker.rawQuantile} ${currency}`}</title>
-      </line>
-      <text
-        className="chart-marker-label"
-        x={plot.markerX}
-        y={plot.plotTop}
-        dx={plot.markerLabelAnchor === 'end' ? -4 : 4}
-        dy={-8}
-        textAnchor={plot.markerLabelAnchor}
-      >
-        {marker}
-      </text>
-    </svg>
+            {dist.buckets.map((_, index) => (
+              <option key={index} value={index}>
+                {String(index + 1)} of {String(dist.bucketCount)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="loss-inspector-value" aria-hidden="true" data-testid="loss-bucket-value">
+          {inspected === undefined ? null : (
+            <>
+              <strong>
+                Bucket {String(active + 1)} · {String(inspected.count)} scenarios
+              </strong>
+              <span>
+                Approx. {inspected.lower.replace(/([.][0-9]{2})[0-9]+$/, '$1')} to{' '}
+                {inspected.upper.replace(/([.][0-9]{2})[0-9]+$/, '$1')} {currency}
+              </span>
+            </>
+          )}
+        </div>
+        <details className="loss-bucket-exact">
+          <summary>Exact selected range</summary>
+          <p>{committed === undefined ? null : rangeText(committed, currency)}</p>
+        </details>
+        <span className="loss-inspector-announcement" role="status">
+          {committed === undefined
+            ? null
+            : `Bucket ${String(selected + 1)}: ${String(committed.count)} scenarios; ${rangeText(committed, currency)}`}
+        </span>
+      </div>
+    </>
   );
 }
 
-export function LossDistributionSection({ data }: { readonly data: View }): ReactElement {
+export function LossDistributionSection({
+  data,
+  compact = false,
+}: {
+  readonly data: View;
+  readonly compact?: boolean;
+}): ReactElement {
+  const id = useId();
+  const titleId = compact ? `${id}-title` : 'loss-title';
   const dist = data.lossDistribution;
   const wrapRef = useRef<HTMLDivElement>(null);
   const chartWidth = useContainerWidth(wrapRef, `${data.portfolioId}:${dist.status}`);
@@ -181,12 +273,12 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
       : `Base VaR scenarios · 1 day · ${confidencePct(data.view.confidence)} · Historical Simulation`;
   return (
     <section
-      className="section chart-surface theme-dark"
-      aria-labelledby="loss-title"
+      className={`section chart-surface theme-dark loss-distribution ${compact ? 'loss-overview' : 'loss-analytics'}`}
+      aria-labelledby={titleId}
       data-testid="loss-distribution"
     >
-      <h2 id="loss-title">
-        Loss distribution <span className="muted-inline">· {params}</span>
+      <h2 id={titleId}>
+        Loss distribution <span className="muted-inline">· {compact ? 'Base VaR scenarios' : params}</span>
       </h2>
       <p className="badges" data-testid="loss-badges">
         {dist.status === 'AVAILABLE' ? (
@@ -230,38 +322,55 @@ export function LossDistributionSection({ data }: { readonly data: View }): Reac
               aria-label="Loss distribution chart, scrollable"
               tabIndex={0}
             >
-              <Chart dist={dist} containerWidth={chartWidth} />
+              <Chart
+                key={`${data.portfolioId}:${dist.calculatedAt}`}
+                dist={dist}
+                containerWidth={chartWidth}
+                overview={compact}
+              />
             </div>
           </div>
-          <div className="loss-side" data-testid="loss-side">
-            <p className="loss-side-label">Scenario analysis</p>
-            <p className="caption" data-testid="loss-summary">
-              {/* Concise: backend display text only. The exact, unrounded values are in the
-                disclosure below (institutional refinement; nothing is rounded here). */}
+          {compact ? (
+            <p className="caption loss-overview-note" data-testid="loss-summary">
               <strong className="scenario-fraction">
                 {String(dist.varMarker.scenariosAbove)} of {String(dist.scenarioCount)} scenarios exceeded the
                 VaR marker.
-              </strong>
-              {String(dist.scenarioCount)} scenarios from returns ending {dist.scenarioWindow.firstDate} to{' '}
-              {dist.scenarioWindow.lastDate} (UTC dates), in {String(dist.bucketCount)} buckets of{' '}
-              {withUnit(dist.widthDisplay, dist.currency)}. VaR {confidencePct(dist.confidence)} marker at{' '}
+              </strong>{' '}
+              VaR {confidencePct(dist.confidence)} marker at{' '}
               {withUnit(dist.varMarker.rawQuantileDisplay, dist.currency)}. The orange bucket containing the
-              marker may include scenarios at or below it. Not a forecast and not the worst possible loss.
+              marker may include scenarios at or below it.
             </p>
-          </div>
+          ) : (
+            <div className="loss-side" data-testid="loss-side">
+              <p className="loss-side-label">Scenario analysis</p>
+              <p className="caption" data-testid="loss-summary">
+                {/* Concise: backend display text only. The exact, unrounded values are in the
+                disclosure below (institutional refinement; nothing is rounded here). */}
+                <strong className="scenario-fraction">
+                  {String(dist.varMarker.scenariosAbove)} of {String(dist.scenarioCount)} scenarios exceeded
+                  the VaR marker.
+                </strong>
+                {String(dist.scenarioCount)} scenarios from returns ending {dist.scenarioWindow.firstDate} to{' '}
+                {dist.scenarioWindow.lastDate} (UTC dates), in {String(dist.bucketCount)} buckets of{' '}
+                {withUnit(dist.widthDisplay, dist.currency)}. VaR {confidencePct(dist.confidence)} marker at{' '}
+                {withUnit(dist.varMarker.rawQuantileDisplay, dist.currency)}. The orange bucket containing the
+                marker may include scenarios at or below it. Not a forecast and not the worst possible loss.
+              </p>
+            </div>
+          )}
           {/* Progressive disclosure (ui-guidelines §3): the summary above and the chart's own
               description stay visible; the exact bucket table is one native disclosure away.
               Closed, it sits in the side column under the summary; opened, it spans the card. */}
           <details className="disclosure loss-details" data-testid="loss-table-details">
             <summary>Exact values and bucket table ({String(dist.bucketCount)} buckets)</summary>
-            <p className="exact-hint" id="loss-exact-hint">
+            <p className="exact-hint" id={`${id}-exact-hint`}>
               Full precision, unrounded. Scroll sideways in the boxes to read each value and the bucket table.
             </p>
             <div
               className="exact-values"
               role="region"
               aria-label="Exact loss distribution values, scrollable"
-              aria-describedby="loss-exact-hint"
+              aria-describedby={`${id}-exact-hint`}
               tabIndex={0}
               data-testid="loss-exact"
             >

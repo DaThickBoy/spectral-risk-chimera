@@ -1,0 +1,114 @@
+.loss-distribution {
+  container-type: inline-size;
+}
+
+@container (min-width: 66rem) {
+  .loss-analytics .loss-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 24%);
+  }
+
+  .loss-analytics .loss-side {
+    align-self: start;
+    border-top: 0;
+    border-inline-start: 1px solid var(--color-border);
+    padding-block-start: 0;
+    padding-inline-start: var(--space-4);
+  }
+
+  .loss-analytics .loss-details {
+    grid-column: 1 / -1;
+  }
+}
+
+.loss-distribution .chart-wrap {
+  min-width: 0;
+}
+
+.loss-distribution .loss-chart {
+  max-width: none;
+}
+
+.loss-distribution .legend {
+  margin-top: 0;
+}
+
+.loss-distribution .chart-marker,
+.loss-distribution .chart-grid,
+.loss-distribution .chart-axis {
+  vector-effect: non-scaling-stroke;
+}
+
+.loss-active-slot {
+  fill: var(--chart-axis);
+  fill-opacity: 0.14;
+  stroke: var(--chart-axis);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.loss-bucket-hit {
+  fill: transparent;
+  cursor: pointer;
+  touch-action: pan-y pinch-zoom;
+}
+
+.loss-inspector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-3);
+  margin: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  color: var(--color-text-secondary);
+  font-size: var(--size-small);
+}
+
+.loss-inspector-control {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.loss-inspector-control select {
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font: inherit;
+  color-scheme: dark;
+}
+
+.loss-inspector-value {
+  flex: 1 1 15rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.loss-inspector-value strong {
+  display: block;
+  color: var(--color-text);
+}
+
+.loss-inspector-value span {
+  font-family: var(--font-num);
+}
+
+.loss-inspector-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.loss-analytics .loss-chart:not(.loss-chart-compact) {
+  max-width: 800px;
+  margin-inline: auto;
+}

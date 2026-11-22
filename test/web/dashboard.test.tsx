@@ -6,6 +6,7 @@
 // Validates: Requirements 17.10, 20.7, 30.14, 35.1, 35.4, 35.6, 35.7
 import { readFileSync } from 'node:fs';
 import axe from 'axe-core';
+import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../../src/web/App.tsx';
 import { DashboardViewResponseSchema } from '../../src/shared/apiContracts/index.js';
@@ -13,13 +14,30 @@ import { percentText } from '../../src/web/format.ts';
 import { OD1_TEXT, demoIndex, fxProblemView, multiCurrencyView } from './fixtures.js';
 import { memorySource, render, settle, text } from './render.js';
 import type { Rendered } from './render.js';
+import { viewHref } from '../../src/web/router.ts';
+import type { ViewId } from '../../src/web/router.ts';
 
 const mounted: Rendered[] = [];
 afterEach(() => {
   for (const r of mounted.splice(0)) r.unmount();
+  window.history.replaceState(null, '', window.location.pathname + window.location.search);
 });
 
-async function show(view = multiCurrencyView(), kind: 'LIVE' | 'REPLAY' = 'LIVE'): Promise<Rendered> {
+const routes = ['overview', 'risk', 'portfolio', 'signals', 'fx'] as const;
+
+async function navigate(route: ViewId): Promise<void> {
+  await act(async () => {
+    window.history.replaceState(null, '', viewHref(route));
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+}
+
+async function show(
+  route: ViewId = 'overview',
+  view = multiCurrencyView(),
+  kind: 'LIVE' | 'REPLAY' = 'LIVE',
+): Promise<Rendered> {
+  window.history.replaceState(null, '', viewHref(route));
   const r = await render(
     <App
       source={memorySource({
@@ -35,13 +53,13 @@ async function show(view = multiCurrencyView(), kind: 'LIVE' | 'REPLAY' = 'LIVE'
 
 describe('panels and data mode (AT-DSH-01, AT-DSH-15)', () => {
   it('shows the four risk panels separately and in the required order', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     const headings = [...container.querySelectorAll('.panels h2')].map((h) => h.textContent);
     expect(headings).toEqual(['Base VaR', 'Sentiment-Adjusted VaR', 'Market Sentiment', 'SEC Filing Risk']);
   });
 
   it('Base VaR: backend display text with its unit, parameters, DEMO label, and percentile wording', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     expect(container.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('124.10 EUR');
     const panel = text(container.querySelector('#base-var-title')?.closest('section') as HTMLElement);
     expect(panel).toMatch(
@@ -54,7 +72,7 @@ describe('panels and data mode (AT-DSH-01, AT-DSH-15)', () => {
   });
 
   it('Adjusted VaR: "Unavailable" with the OD-1 reason, never the Base figure (H7)', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     const panel = container.querySelector('#adjusted-var-title')?.closest('section') as HTMLElement;
     expect(panel.querySelector('[data-testid="adjusted-var-value"]')?.textContent).toBe('Unavailable');
     expect(text(panel)).toContain(OD1_TEXT);
@@ -64,7 +82,7 @@ describe('panels and data mode (AT-DSH-01, AT-DSH-15)', () => {
   });
 
   it('SEC filing risk is NOT CONFIGURED with no score; scale captions are separate (AT-DSH-12)', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     const filing = text(container.querySelector('#filing-title')?.closest('section') as HTMLElement);
     expect(filing).toContain('NOT CONFIGURED');
     expect(filing).toContain('0 (low) to 1 (high)');
@@ -73,7 +91,7 @@ describe('panels and data mode (AT-DSH-01, AT-DSH-15)', () => {
   });
 
   it('explains replay freshness and the scope of Base VaR', async () => {
-    const { container } = await show(multiCurrencyView(), 'REPLAY');
+    const { container } = await show('overview', multiCurrencyView(), 'REPLAY');
     expect(text(container)).toContain('Fresh at replay time');
     expect(container.querySelector('[data-testid="summary"]')?.textContent).toContain(
       'One-day asset-price VaR · FX held fixed',
@@ -91,7 +109,7 @@ describe('panels and data mode (AT-DSH-01, AT-DSH-15)', () => {
     // S1: NAV, as-of, calculation time, and freshness moved to the headline summary.
     expect(bar).not.toContain('22375.74 EUR');
     const summary = text(container.querySelector('[data-testid="summary"]') as HTMLElement);
-    expect(summary).toContain('market data as of 2026-11-06 · calculated 2026-11-06 16:00 UTC');
+    expect(summary).toContain('Market data as of 2026-11-06 · Calculated 2026-11-06 16:00 UTC');
     expect(summary).toContain('CURRENT');
     expect(text(container)).toContain('DEMO DATA: prices and history are deterministic fixtures');
   });
@@ -102,7 +120,7 @@ describe('panel times, provenance labels, and DEMO badges (ui-guidelines 3 and 4
     text(container.querySelector(`#${id}-title`)?.closest('section') as HTMLElement);
 
   it('every risk panel header states its parameters and its time', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     expect(panelText(container, 'base-var')).toContain(
       '1 day · 95% · asset-price VaR · FX held fixed · Historical Simulation · as of 2026-11-06',
     );
@@ -116,7 +134,7 @@ describe('panel times, provenance labels, and DEMO badges (ui-guidelines 3 and 4
   });
 
   it('a sentiment value without an observation shows "—" and no basis or observation time', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     const row = text(container.querySelector('[data-testid="sentiment-DEMO-EU"]') as HTMLElement);
     // textContent includes the badge's decorative (aria-hidden) icon glyph.
     expect(row).toMatch(/^DEMO-EU \u2014 .?UNAVAILABLE$/);
@@ -145,7 +163,7 @@ describe('panel times, provenance labels, and DEMO badges (ui-guidelines 3 and 4
         ),
       },
     });
-    const { container } = await show(variant);
+    const { container } = await show('signals', variant);
     const row = text(container.querySelector('[data-testid="sentiment-DEMO-UK"]') as HTMLElement);
     expect(row).toContain('DEMO-UK -0.72');
     expect(row).toContain('CURRENT');
@@ -158,22 +176,21 @@ describe('panel times, provenance labels, and DEMO badges (ui-guidelines 3 and 4
 
   it('DEMO data is labelled on the headline summary and the currency exposure', async () => {
     const { container } = await show();
-    expect(text(container.querySelector('[data-testid="summary-badges"]') as HTMLElement)).toContain(
-      'DEMO DATA',
-    );
+    expect(text(container.querySelector('.demo-banner') as HTMLElement)).toContain('DEMO DATA');
+    await navigate('portfolio');
     expect(text(container.querySelector('[data-testid="ccy-badges"]') as HTMLElement)).toContain('DEMO');
   });
 
   it('positions name the FX rates they were converted at', async () => {
-    const { container } = await show();
-    const caption = container.querySelector('#positions-title')?.closest('section')?.querySelector('caption');
+    const { container } = await show('portfolio');
+    const caption = container.querySelector('#positions-valuation');
     expect(caption?.textContent).toMatch(/converted at the rates listed in “FX rates used”/);
   });
 });
 
 describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
   it('ECB rates are labelled derived inverses with the statement and both notes; exact rates are shown', async () => {
-    const { container } = await show();
+    const { container } = await show('fx');
     expect(container.querySelector('[data-testid="derived-USD"]')?.textContent).toBe(
       'Derived: 1 / published EUR→USD (40 significant digits, ROUND HALF UP)',
     );
@@ -187,7 +204,7 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
   });
 
   it('OD-20: the published ECB observation is shown separately from the derived rate', async () => {
-    const { container } = await show();
+    const { container } = await show('fx');
     const usd = container.querySelector('[data-testid="quote-USD"]')?.textContent ?? '';
     expect(usd).toContain('EUR→USD 1.1165');
     expect(usd).toContain('Published observation · reference date 2026-11-06');
@@ -196,7 +213,7 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
   });
 
   it('allocation is padded to two decimals, never re-rounded; money uses the backend display text', async () => {
-    const { container } = await show();
+    const { container } = await show('portfolio');
     const positions = text(container.querySelector('#positions-title')?.closest('section') as HTMLElement);
     expect(positions).toContain('40.20%');
     expect(positions).toContain('29.74%');
@@ -212,12 +229,16 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
     expect(value('nav')).toBe('22375.74 EUR');
     expect(value('base-var')).toBe('124.10 EUR');
     expect(value('gross')).toBe('21375.74 EUR');
+    const breakdown = container.querySelector('[data-testid="summary-net"]')?.closest('details');
+    expect(breakdown?.querySelector('summary')?.textContent).toBe('Exposure and cash breakdown');
+    expect(breakdown?.open).toBe(false);
+    if (breakdown) breakdown.open = true;
     expect(value('net')).toBe('21375.74 EUR');
     expect(value('long')).toBe('21375.74 EUR');
     expect(value('short')).toBe('0.00 EUR'); // a genuine zero from the backend, not a placeholder
     expect(value('cash')).toBe('1000.00 EUR');
     const summary = container.querySelector('[data-testid="summary"]') as HTMLElement;
-    expect(text(summary)).toContain('Base VaR · 1 day · 95%');
+    expect(text(summary)).toContain('95% confidence · 1 day · historical simulation');
     expect(text(summary)).toContain('CURRENT');
     expect(text(summary)).not.toMatch(/%\s*of NAV|% NAV/); // no VaR share of NAV in the headline
     // The summary comes directly after the top bar, before the risk panels.
@@ -226,7 +247,7 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
   });
 
   it('S1 summary: unavailable figures are "—" with their badges; cash stays the backend value', async () => {
-    const { container } = await show(fxProblemView());
+    const { container } = await show('overview', fxProblemView());
     const value = (id: string) => container.querySelector(`[data-testid="summary-${id}"]`)?.textContent;
     for (const id of ['nav', 'base-var', 'gross', 'net', 'long', 'short'])
       expect(value(id), id).toBe('\u2014');
@@ -244,11 +265,11 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
       view: { ...base.view, baseVaR: { ...base.view.baseVaR, validity: 'STALE' } },
       freshness: { ...base.freshness, summary: 'STALE_INPUTS' },
     });
-    const { container } = await show(stale);
+    const { container } = await show('overview', stale);
     const summary = text(container.querySelector('[data-testid="summary"]') as HTMLElement);
     expect(summary).toContain('STALE INPUTS');
     // The badge's decorative (aria-hidden) icon glyph sits between the label and its text.
-    expect(summary).toMatch(/Base VaR · 1 day · 95%\s?.?STALE/);
+    expect(summary).toMatch(/95% confidence · 1 day · historical simulation\s?.?STALE/);
     expect(container.querySelector('[data-testid="summary-base-var"]')?.textContent).toBe('124.10 EUR');
   });
 
@@ -259,7 +280,7 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
       (row(container, ticker).querySelector('.allocation-bar') as HTMLElement | null)?.style.width;
 
     it('every position plotted: one composition bar plus a legend with the exact backend percentages', async () => {
-      const { container } = await show();
+      const { container } = await show('portfolio');
       const chart = container.querySelector('[data-testid="allocation-chart"]') as HTMLElement;
       expect(text(chart)).toContain('Allocation by position');
       expect(text(chart)).toContain('DEMO');
@@ -324,7 +345,7 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
           ],
         },
       });
-      const { container } = await show(mixed);
+      const { container } = await show('portfolio', mixed);
       expect(text(row(container, 'DEMO-EU'))).toBe('DEMO-EU0.00%');
       expect(width(container, 'DEMO-EU')).toBe('0%');
       expect(text(row(container, 'DEMO-UK'))).toMatch(/^DEMO-UK\u2014 .?FX STALE$/);
@@ -333,7 +354,7 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
     });
 
     it('with no allocation at all, nothing is plotted and the reason is stated', async () => {
-      const { container } = await show(fxProblemView());
+      const { container } = await show('portfolio', fxProblemView());
       expect(container.querySelector('[data-testid="allocation-unavailable"]')?.textContent).toContain(
         'No allocation is available for this portfolio',
       );
@@ -348,7 +369,7 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
       row(container, ccy).querySelector('.allocation-bar') as HTMLElement | null;
 
     it('one bar per currency in backend order, labelled with the backend display text in EUR', async () => {
-      const { container } = await show();
+      const { container } = await show('portfolio');
       const chart = container.querySelector('[data-testid="exposure-chart"]') as HTMLElement;
       expect(text(chart)).toContain('Exposure by currency, in EUR');
       expect(text(chart)).toContain('axis 0 to gross exposure (21375.74 EUR)');
@@ -382,7 +403,7 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
           ],
         },
       });
-      const { container } = await show(variant);
+      const { container } = await show('portfolio', variant);
       expect(text(row(container, 'EUR'))).toBe('EUR0.00 EUR');
       expect(bar(container, 'EUR')?.style.width).toBe('0%');
       expect(text(row(container, 'GBP'))).toBe('GBP-500.00 EUR');
@@ -391,7 +412,7 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
     });
 
     it('unavailable values have no bar and keep their status; without gross exposure nothing is plotted', async () => {
-      const { container } = await show(fxProblemView());
+      const { container } = await show('portfolio', fxProblemView());
       expect(text(row(container, 'GBP'))).toMatch(/^GBP\u2014 .?UNAVAILABLE$/);
       expect(text(row(container, 'USD'))).toMatch(/^USD\u2014 .?UNAVAILABLE$/);
       expect(text(row(container, 'EUR'))).toBe('EUR8994.29 EUR'); // the value stays visible
@@ -412,18 +433,18 @@ describe('FX attribution and exposure (AT-FX-18, AT-ALC-11, AT-DSH-13)', () => {
 
 describe('stale and unavailable data (AT-DSH-09, AT-DSH-10)', () => {
   it('stale and unavailable FX show their badges; missing values are "—", never zero', async () => {
-    const { container } = await show(fxProblemView());
+    const { container } = await show('fx', fxProblemView());
     const fx = text(container.querySelector('#fx-title')?.closest('section') as HTMLElement);
     expect(fx).toContain('STALE');
     expect(fx).toContain('UNAVAILABLE');
     expect(fx).toContain('PROVIDER ERROR');
-    expect(container.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('\u2014');
+    await navigate('overview');
     const summary = text(container.querySelector('[data-testid="summary"]') as HTMLElement);
-    // S4: the NAV help trigger ("?") sits between the label and the value.
-    expect(summary).toMatch(/NAV\??\u2014/);
+    expect(container.querySelector('[data-testid="summary-nav"]')?.textContent).toBe('—');
     expect(summary).toContain('EXPOSURE UNAVAILABLE');
     expect(summary).toContain('FX UNAVAILABLE');
-    expect(summary).not.toMatch(/NAV\??0/);
+    await navigate('signals');
+    expect(container.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('—');
     expect(text(container.querySelector('#base-var-title')?.closest('section') as HTMLElement)).toContain(
       'Unavailable: FX UNAVAILABLE',
     );
@@ -449,8 +470,9 @@ describe('loading and error states', () => {
     expect(r.container.querySelector('main')?.getAttribute('aria-busy')).toBe('true');
     resolveView({ ok: true, value: multiCurrencyView() });
     await settle();
-    expect(r.container.querySelector('[role="status"]')).toBeNull();
-    expect(r.container.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('124.10 EUR');
+    expect(r.container.querySelector('.state-loading')).toBeNull();
+    expect(r.container.querySelector('main')?.getAttribute('aria-busy')).toBe('false');
+    expect(r.container.querySelector('[data-testid="summary-base-var"]')?.textContent).toBe('124.10 EUR');
   });
 
   it('an unreachable source shows an alert, and "Try again" reloads', async () => {
@@ -471,7 +493,7 @@ describe('loading and error states', () => {
     retry?.click();
     await settle();
     expect(source.calls.filter((c) => c === 'index')).toHaveLength(2);
-    expect(r.container.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('124.10 EUR');
+    expect(r.container.querySelector('[data-testid="summary-base-var"]')?.textContent).toBe('124.10 EUR');
   });
 
   it('a view that fails validation is not shown', async () => {
@@ -509,21 +531,26 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
   const section = (container: HTMLElement): HTMLElement =>
     container.querySelector('[data-testid="loss-distribution"]') as HTMLElement;
 
-  it('fintech order: the main visual beside allocation, before the risk signals and the tables', async () => {
+  it('Overview shows risk and allocation previews in order, linking to full views', async () => {
     const { container } = await show();
-    const titles = [...container.querySelectorAll('main h2')].map((h) => h.id);
     const grid = container.querySelector('[data-testid="viz-grid"]') as HTMLElement;
-    expect([...grid.querySelectorAll('h2')].map((h) => h.id)).toEqual(['loss-title', 'allocation-heading']);
-    expect(titles.indexOf('allocation-heading')).toBe(titles.indexOf('loss-title') + 1);
-    expect(titles.indexOf('base-var-title')).toBeGreaterThan(titles.indexOf('allocation-heading'));
-    expect(titles.indexOf('positions-title')).toBeLessThan(titles.indexOf('base-var-title'));
-    expect(titles.indexOf('ccy-title')).toBeLessThan(titles.indexOf('positions-title'));
-    // The loss distribution is the one navy chart surface.
-    expect(section(container).classList.contains('theme-dark')).toBe(true);
+    expect([...grid.querySelectorAll('h2')].map((h) => h.textContent)).toEqual([
+      'Loss distribution · Base VaR scenarios',
+      'Allocation',
+    ]);
+    expect([...grid.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual([
+      '#/risk',
+      '#/portfolio',
+    ]);
+    expect(grid.querySelector('[data-testid="loss-distribution"]')?.classList.contains('theme-dark')).toBe(
+      true,
+    );
+    expect(container.querySelector('main table:not(details table), .panels')).toBeNull();
+    expect(grid.querySelector<HTMLDetailsElement>('[data-testid="loss-table-details"]')?.open).toBe(false);
   });
 
   it('states the metric, parameters, calculation time, validity, and DEMO label', async () => {
-    const { container } = await show();
+    const { container } = await show('risk');
     const heading = text(container.querySelector('#loss-title') as HTMLElement);
     expect(heading).toBe(
       'Loss distribution · Base VaR scenarios · 1 day · 95% · Historical Simulation · as of 2026-11-06 16:00 UTC',
@@ -534,14 +561,14 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
   });
 
   it('chart: accessible name and description, axis labels with units, legend, and the labelled VaR marker', async () => {
-    const { container } = await show();
+    const { container } = await show('risk');
     const svg = container.querySelector('[data-testid="loss-chart"]') as SVGElement;
     expect(svg.getAttribute('role')).toBe('img');
-    expect(svg.getAttribute('aria-labelledby')).toBe('loss-chart-title loss-chart-desc');
-    expect(svg.querySelector('#loss-chart-title')?.textContent).toBe(
-      'Base VaR scenario losses, 4 buckets, EUR',
-    );
-    expect(svg.querySelector('#loss-chart-desc')?.textContent).toContain(
+    const [titleId, descId] = svg.getAttribute('aria-labelledby')?.split(' ') ?? [];
+    expect(svg.querySelector('title')?.id).toBe(titleId);
+    expect(svg.querySelector('desc')?.id).toBe(descId);
+    expect(svg.querySelector('title')?.textContent).toBe('Base VaR scenario losses, 4 buckets, EUR');
+    expect(svg.querySelector('desc')?.textContent).toContain(
       'The VaR marker at 95% is 6.55 EUR. Scenarios with a larger loss: 1.',
     );
     const svgText = svg.textContent;
@@ -558,7 +585,7 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
   });
 
   it('bars and tooltips use the exact backend strings; the marker sits at the backend position', async () => {
-    const { container } = await show();
+    const { container } = await show('risk');
     const bars = [...container.querySelectorAll('[data-testid^="loss-bar-"]')];
     expect(bars.map((b) => b.querySelector('title')?.textContent)).toEqual([
       '-2 to 0.25 EUR (upper edge excluded): 3 scenarios',
@@ -586,7 +613,7 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
   });
 
   it('the table lists every bucket with exact canonical edges, counts, and the marker bucket', async () => {
-    const { container } = await show();
+    const { container } = await show('risk');
     const rows = [...container.querySelectorAll('[data-testid="loss-table"] tbody tr')].map((row) =>
       [...row.children].map((cell) => cell.textContent),
     );
@@ -612,7 +639,7 @@ describe('A2 loss distribution (ui-guidelines 5)', () => {
   });
 
   it('unavailable: the reason and explanation only; no chart, no table, no zero bars', async () => {
-    const { container } = await show(fxProblemView());
+    const { container } = await show('risk', fxProblemView());
     const s = section(container);
     expect(text(s)).toContain(
       'Unavailable (BASE VAR UNAVAILABLE): Base VaR is unavailable (FX_UNAVAILABLE), so no scenario loss distribution is shown.',
@@ -631,7 +658,7 @@ describe('accessibility and layout', () => {
     ['current data', multiCurrencyView],
     ['FX problems', fxProblemView],
   ])('axe-core finds no violations (%s)', async (_name, build) => {
-    const { container } = await show(build());
+    const { container } = await show('overview', build());
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
   });
@@ -686,13 +713,18 @@ describe('accessibility and layout', () => {
     expect(css).not.toMatch(/@keyframes|animation:/);
   });
 
-  it('every table has a caption and column headers', async () => {
-    const { container } = await show();
-    for (const table of container.querySelectorAll('table')) {
-      expect(table.querySelector('caption')?.textContent?.length).toBeGreaterThan(0);
-      expect(table.querySelectorAll('th[scope="col"]').length).toBeGreaterThan(0);
-    }
-  });
+  it.each(['risk', 'portfolio', 'fx'] as const)(
+    'every table on %s has a caption and column headers',
+    async (route) => {
+      const { container } = await show(route);
+      const tables = container.querySelectorAll('table');
+      expect(tables.length).toBeGreaterThan(0);
+      for (const table of tables) {
+        expect(table.querySelector('caption')?.textContent?.length).toBeGreaterThan(0);
+        expect(table.querySelectorAll('th[scope="col"]').length).toBeGreaterThan(0);
+      }
+    },
+  );
 });
 
 describe('S5 final polish', () => {
@@ -700,7 +732,7 @@ describe('S5 final polish', () => {
     container.querySelector(`[data-testid="panel-${id}"]`) as HTMLElement;
 
   it('Adjusted VaR: concise visible status with OD-1; engine status and full reason in a closed native disclosure', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     const panel = panelEl(container, 'adjusted-var');
     const visible = panel.querySelector('.badges') as HTMLElement;
     expect(text(visible)).toContain('UNAVAILABLE');
@@ -715,7 +747,7 @@ describe('S5 final polish', () => {
   });
 
   it('SEC filing: one compact status row with "—" and NOT CONFIGURED; no score and no controls', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     const panel = panelEl(container, 'filing');
     const status = panel.querySelector('[data-testid="filing-status"]') as HTMLElement;
     expect(status.querySelector('.metric')?.textContent).toBe('\u2014');
@@ -726,29 +758,21 @@ describe('S5 final polish', () => {
   });
 
   it('Base VaR is the one primary panel; the four panels stay separate and in order', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     expect(
       [...container.querySelectorAll('.panel-primary')].map((p) => p.getAttribute('data-testid')),
     ).toEqual(['panel-base-var']);
     expect(container.querySelectorAll('.panels > section.panel')).toHaveLength(4);
   });
 
-  it('sections follow positions, loss distribution, currency exposure, then FX rates, each full width', async () => {
-    const { container } = await show();
-    const order = [...container.querySelectorAll('main section h2')].map((h) => h.id);
-    expect(order.slice(order.indexOf('ccy-title'))).toEqual([
-      'ccy-title',
-      'positions-title',
-      'base-var-title',
-      'adjusted-var-title',
-      'sentiment-title',
-      'filing-title',
-      'fx-title',
-    ]);
-    // Visual review: at half width the exact FX rates wrapped into unreadable columns.
-    for (const id of ['ccy-title', 'fx-title']) {
-      expect(container.querySelector(`#${id}`)?.closest('section')?.parentElement?.tagName).toBe('MAIN');
-    }
+  it('Portfolio and FX show their own full-width financial sections', async () => {
+    const { container } = await show('portfolio');
+    const headings = () => [...container.querySelectorAll('main section h2')].map((h) => h.id);
+    expect(headings()).toEqual(['allocation-heading', 'positions-title', 'ccy-title']);
+    expect(container.querySelector('main > section[aria-labelledby="ccy-title"]')).not.toBeNull();
+    await navigate('fx');
+    expect(headings()).toEqual(['fx-title']);
+    expect(container.querySelector('main > section[aria-labelledby="fx-title"]')).not.toBeNull();
   });
 
   it('heading hierarchy: one h1, every section and panel titled by an h2, no skipped levels', async () => {
@@ -777,7 +801,7 @@ describe('S5 final polish', () => {
 
 describe('public-site review fixes', () => {
   it('the exact bucket table is behind a closed native disclosure; the summary and chart stay visible', async () => {
-    const { container } = await show();
+    const { container } = await show('risk');
     const loss = container.querySelector('[data-testid="loss-distribution"]') as HTMLElement;
     const details = loss.querySelector('[data-testid="loss-table-details"]');
     expect(details).toBeInstanceOf(HTMLDetailsElement);
@@ -789,11 +813,12 @@ describe('public-site review fixes', () => {
     expect(details?.contains(loss.querySelector('[data-testid="loss-summary"]'))).toBe(false);
   });
 
-  it('axe-core finds no violations with the bucket table and the Adjusted VaR details open', async () => {
-    const { container } = await show();
-    for (const id of ['loss-table-details', 'adjusted-var-details']) {
-      (container.querySelector(`[data-testid="${id}"]`) as HTMLDetailsElement).open = true;
-    }
+  it.each([
+    ['risk', 'loss-table-details'],
+    ['signals', 'adjusted-var-details'],
+  ] as const)('axe-core finds no violations on %s with the disclosure open', async (route, id) => {
+    const { container } = await show(route);
+    (container.querySelector(`[data-testid="${id}"]`) as HTMLDetailsElement).open = true;
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
   });
@@ -809,7 +834,7 @@ describe('public-site review fixes', () => {
 
 describe('institutional redesign (presentation only)', () => {
   it('Base VaR exact values: complete and unrounded, behind a closed disclosure in a focusable region', async () => {
-    const { container } = await show();
+    const { container } = await show('signals');
     const panel = container.querySelector('[data-testid="panel-base-var"]') as HTMLElement;
     const details = panel.querySelector('[data-testid="base-var-exact"]') as HTMLDetailsElement;
     expect(details).toBeInstanceOf(HTMLDetailsElement);
@@ -829,24 +854,11 @@ describe('institutional redesign (presentation only)', () => {
     expect(panel.querySelector('[data-testid="base-var-value"]')?.textContent).toBe('124.10 EUR');
   });
 
-  it('group labels are plain text between the groups, never headings', async () => {
-    const { container } = await show();
-    const labels = [...container.querySelectorAll('main > .eyebrow')].map((e) => [e.tagName, e.textContent]);
-    expect(labels).toEqual([
-      ['P', 'Risk visualisation'],
-      ['P', 'Currency exposure'],
-      ['P', 'Portfolio'],
-      ['P', 'Risk signals'],
-      ['P', 'FX provenance'],
-    ]);
-    // Each label sits directly before its group.
-    const next = (label: string) =>
-      [...container.querySelectorAll('main > .eyebrow')].find((e) => e.textContent === label)
-        ?.nextElementSibling;
-    expect(next('Risk visualisation')?.getAttribute('data-testid')).toBe('viz-grid');
-    expect(next('Risk signals')?.classList.contains('panels')).toBe(true);
-    expect(next('Portfolio')?.getAttribute('aria-labelledby')).toBe('positions-title');
-    expect(next('Currency exposure')?.getAttribute('aria-labelledby')).toBe('ccy-title');
+  it.each(routes)('each %s view has one page heading, not in the sidebar', async (route) => {
+    const { container } = await show(route);
+    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    expect(container.querySelector(`.page-header h1[id="view-${route}-title"]`)).not.toBeNull();
+    expect(container.querySelector('.sidebar-nav h1, .sidebar-nav h2')).toBeNull();
   });
 
   it('allocation shades: dark position numbers reach 4.5:1 on every shade; shades reach 3:1 on panels', () => {
@@ -886,7 +898,7 @@ describe('institutional redesign (presentation only)', () => {
 
 describe('loss distribution layout (final refinement)', () => {
   it('reading order is chart, then summary, then the disclosure; no value is duplicated', async () => {
-    const { container } = await show();
+    const { container } = await show('risk');
     const layout = container.querySelector('[data-testid="loss-layout"]') as HTMLElement;
     expect([...layout.children].map((c) => c.getAttribute('data-testid'))).toEqual([
       'loss-main',
@@ -903,17 +915,17 @@ describe('loss distribution layout (final refinement)', () => {
   });
 
   it('the loss disclosure has the same visible scroll hint and description as the Base VaR one', async () => {
-    const { container } = await show();
+    const { container } = await show('risk');
     const details = container.querySelector('[data-testid="loss-table-details"]') as HTMLDetailsElement;
-    const hint = details.querySelector('#loss-exact-hint') as HTMLElement;
+    const hint = details.querySelector('.exact-hint') as HTMLElement;
     expect(hint.className).toBe('exact-hint');
     expect(hint.textContent).toBe(
       'Full precision, unrounded. Scroll sideways in the boxes to read each value and the bucket table.',
     );
     const region = details.querySelector('[data-testid="loss-exact"]') as HTMLElement;
-    expect(region.getAttribute('aria-describedby')).toBe('loss-exact-hint');
+    expect(region.getAttribute('aria-describedby')).toBe(hint.id);
     // The hint describes one region only, so it is not announced twice.
-    expect(container.querySelectorAll('[aria-describedby="loss-exact-hint"]')).toHaveLength(1);
+    expect(container.querySelectorAll(`[aria-describedby="${hint.id}"]`)).toHaveLength(1);
   });
 
   it('the stylesheet: the loss card is one column; the visualisation grid is 2:1 and collapses at 1200 px', () => {
@@ -964,30 +976,36 @@ describe('loss distribution layout (final refinement)', () => {
 });
 
 describe('sidebar navigation (fintech refinement)', () => {
-  it('a labelled nav in the sidebar links to section headings that exist on the page', async () => {
+  it('the labelled sidebar links to each workspace and marks only the active view', async () => {
     const { container } = await show();
     const nav = container.querySelector('header.topbar nav.sidebar-nav') as HTMLElement;
-    expect(nav.getAttribute('aria-label')).toBe('Dashboard sections');
-    const links = [...nav.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')]);
-    expect(links).toEqual([
-      ['Overview', '#summary-title'],
-      ['Loss distribution', '#loss-title'],
-      ['Allocation', '#allocation-heading'],
-      ['Risk signals', '#base-var-title'],
-      ['Positions', '#positions-title'],
-      ['Currency and FX', '#ccy-title'],
+    expect(nav.getAttribute('aria-label')).toBe('Dashboard views');
+    const links = [...nav.querySelectorAll('a')];
+    expect(links.map((a) => [a.getAttribute('aria-label'), a.getAttribute('href')])).toEqual([
+      ['Overview', '#/overview'],
+      ['Risk Analytics', '#/risk'],
+      ['Portfolio', '#/portfolio'],
+      ['Risk Signals', '#/signals'],
+      ['FX & Provenance', '#/fx'],
     ]);
-    for (const [, href] of links) {
-      expect(container.querySelector(String(href))?.tagName, String(href)).toBe('H2');
+    for (const route of routes) {
+      await navigate(route);
+      expect([...nav.querySelectorAll('[aria-current="page"]')].map((a) => a.getAttribute('href'))).toEqual([
+        viewHref(route),
+      ]);
     }
-    // The nav precedes the page controls in the DOM (identity and navigation, then controls).
     const select = container.querySelector('#portfolio-select') as HTMLElement;
     expect(nav.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('the stylesheet keeps section navigation accessible in the compact header', () => {
-    expect(css).toMatch(
-      /@media \(max-width: 900px\) \{[\s\S]*?\.sidebar-nav ul \{\s*display: flex;\s*flex-wrap: wrap;/,
-    );
+  it('the compact header exposes a menu button to toggle workspace navigation', async () => {
+    const { container } = await show();
+    const toggle = container.querySelector<HTMLButtonElement>('#workspace-menu-toggle');
+    expect(toggle?.getAttribute('aria-controls')).toBe('workspace-nav');
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => {
+      toggle?.click();
+    });
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
   });
 });

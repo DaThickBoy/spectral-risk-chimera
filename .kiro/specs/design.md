@@ -2066,6 +2066,8 @@ Implementation (task 17.1): `buildPortfolioRiskView` in `src/app/riskViewBuilder
 
 ### Dashboard (`web/`)
 
+**Workspace navigation (owner-approved redesign).** The replay entry point remains a single static HTML resource. Hash destinations separate Overview, Risk Analytics, Portfolio, Risk Signals and FX & Provenance without requiring server routing. Portfolio selection and snapshot loading live above the active view, independently of the route. Historical in-page navigation guidance is superseded; read-only data contracts and signal separation remain unchanged. See the workspace decision in `.kiro/steering/ui-guidelines.md` for presentation and accessibility requirements.
+
 - A single-page app with four visually separate panels: Sentiment, SEC Filing Risk, Base VaR, Sentiment-Adjusted VaR, plus a positions/allocation table and an alert list (R35.1).
 - The Base VaR and Adjusted VaR panels each render their own `VarEntry`. When Adjusted VaR is `UNAVAILABLE`, its panel shows "Unavailable" and the reason (missing keys, or tickers whose sentiment is not current). It never shows the Base figure, a number, or zero, and shows a last valid figure only when labelled `LAST_VALID` with its timestamp (R17.10, R35.6, AT-DSH-15).
 - Status badges with text labels (`Current`, `Stale`, `Unavailable`, `Demo`) (R35.4). Scale captions: filing 0 (low) to 1 (high risk); sentiment -1 (bearish) to +1 (bullish) (R35.7).
@@ -2911,3 +2913,7 @@ A script (`test/tools/coverage-matrix`) parses the requirement IDs cited in test
 6. All of the above pass on Node.js 24.22.1 and Node.js 26 (R27.12).
 7. Benchmarks run and record the environment (not a gate until OD-2 is resolved).
 8. Dependencies are pinned to exact versions, the lockfile is committed, and `npm audit` is run on each change (R26.5). Task 25.3: CI runs `npm audit --audit-level=high` over all dependencies (high and critical fail); findings and exceptions follow `SECURITY.md`, which never suppresses a finding or bypasses CI; pins and lockfile integrity are checked offline in CI and by AT-ARC-05.
+
+## Final replay presentation (2026-11-22)
+
+The existing five hash destinations remain independent views; the portfolio query selection is shared. Overview leads with NAV and Base VaR. Risk Analytics retains the exact threshold and bucket table; Portfolio retains signed positions; Signals distinguishes unavailable integrations from observations; FX & Provenance links trade records, ledger, ECB FX, scenarios, and Base VaR. The static replay makes no claim to live processing.

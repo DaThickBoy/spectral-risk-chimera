@@ -18,7 +18,7 @@ The Frankenstein integration connects trade ingestion, central-bank FX provenanc
 
 The replay uses synthetic prices and histories, a fixed reference clock, and a recorded ECB response. Base VaR models one-day asset-price changes with FX held fixed. Synthetic sentiment does not affect risk. Adjusted VaR remains unavailable pending the aggregation decision, and SEC filing analysis is unconfigured.
 
-The dark redesign is a verified local build. The public link currently shows the earlier interface with the same recorded results.
+The public link has not been verified against the current candidate. The five-view dashboard has passed local validation and awaits owner-approved release and subsequent signed-out verification. Until then, the public site and the current branch are not claimed to match.
 
 ## Technical overview
 
@@ -28,11 +28,19 @@ CSV ingestion validates, quarantines, and deduplicates records. After commit, th
 
 The risk engine applies aligned adjusted-close simple returns to current signed exposures. The demo configuration uses a one-day horizon, 95% confidence, a target of 250 returns with a minimum of 200, and the Hyndman–Fan type 7 quantile. FX stays fixed across scenarios. SQLite stores calculation snapshots for recomputation.
 
-React presents the backend results, with chart calculations limited to display geometry. GitHub Pages serves responses captured from the backend with a fixed clock and recorded inputs. The replay manifest includes hashes for each view and the ECB recording. The standalone backend runs in the supported loopback demo configuration.
+React presents the backend results, with chart calculations limited to display geometry. GitHub Pages serves responses captured from the backend with a fixed clock and recorded inputs — static files only, no public backend. The replay manifest includes hashes for each view and the ECB recording. The standalone backend runs in the supported loopback demo configuration. At the audited baseline (`75ce8d6`, 2026-11-21), typecheck, lint, format, module-boundary checks, 3794 Vitest tests (1 skipped), and 49 Playwright browser tests against the built replay all pass.
+
+## How this maps to the judging criteria
+
+- **Potential Impact** — Risk figures are only useful if they can be defended. Exact decimal arithmetic, published-versus-derived FX provenance, visible staleness, and explicit unavailability address failure modes that erode trust in real risk reporting.
+- **Technological Implementation** — Strict TypeScript end to end; Zod-validated boundaries; Decimal.js at 40 significant digits with an independent BigInt-fraction property test for the quantile; append-only SQLite ledger with trigger enforcement; a deterministic, hash-manifested replay pipeline with byte-identical re-exports. Local release validation: 3,814 unit/component/integration tests passed, one existing skip, and 66 Chromium tests passed.
+- **Design** — A calm fintech dashboard (light canvas, deep navy chart surfaces) that leads with the answer and keeps the evidence one click away: methodology disclosure, exact-value tables, labelled demo data, and a validated, colour-vision-safe chart palette with numbered badges so colour is never the only cue.
+- **Innovation / Idea** — The Frankenstein stitching is the idea: trade CSV → persisted ledger → published ECB quote → derived inverse → historical scenarios → explainable VaR, with each stage's provenance preserved end to end and reproducible as a static public replay. Spec-first development with Kiro kept the financial rules reviewable before code existed.
+- **Presentation** — A sub-three-minute video that walks the lineage from NAV to the 13-of-250 exceedances, a public demo anyone can open signed out with no setup, and honest, visible limitations instead of silent fallbacks.
 
 ## Development attribution
 
-The repository documents the earlier Kiro-assisted foundation through requirements, design, tasks, steering, and decision records. Codex assisted the subsequent review, dashboard clarifications, dark redesign, targeted tests, and browser verification. See the [Kiro write-up](kiro-usage.md) for evidence and owner-confirmation items.
+The foundation was built spec-first with Kiro: requirements, design, tasks, steering, and decision records, all tracked in the repository, with a [Kiro write-up](kiro-usage.md) and an [evidence packet](evidence/kiro-evidence.md) linking three concrete contributions to owner-supplied transcript excerpts and commits. Later phases used other AI assistance: Codex (independent review, the earlier dark-theme redesign, license-notice remediation, testing) and Claude Code (the current light-theme redesign and release-readiness documentation). The full Kiro transcript is owner-supplied and kept outside the repository; excerpts are shared only with owner approval, and none are fabricated. Commit metadata does not record tool attribution; the owner confirms the phase split.
 
 ## Submission fields
 
@@ -41,7 +49,8 @@ The repository documents the earlier Kiro-assisted foundation through requiremen
 - **Repository** — [DaThickBoy/spectral-risk-chimera](https://github.com/DaThickBoy/spectral-risk-chimera)
 - **Application** — [Spectral Risk Chimera replay](https://dathickboy.github.io/spectral-risk-chimera/)
 - **License** — [MIT](../LICENSE)
-- **Video** — pending owner-provided public YouTube URL
-- **Kiro write-up** — [draft](kiro-usage.md), pending confirmation of historical examples
+- **Video** — pending owner-provided public YouTube URL (none exists yet)
+- **Kiro write-up** — [draft](kiro-usage.md), pending owner confirmation of transcript-excerpt sharing
+- **Deadline** — reported as December 4, 2026, 2:00 p.m. PST; verify against the official rules before submitting
 
 See the [recording script](demo-script.md) and [final checklist](submission-checklist.md) before entering the final URLs.

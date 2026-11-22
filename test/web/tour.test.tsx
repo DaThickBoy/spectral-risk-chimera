@@ -8,10 +8,12 @@ import axe from 'axe-core';
 import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../../src/web/App.tsx';
-import { tourSteps } from '../../src/web/tour.ts';
+import { tourSteps, tourView } from '../../src/web/tour.ts';
+import { viewHref } from '../../src/web/router.ts';
+import type { ViewId } from '../../src/web/router.ts';
 import type { DashboardViewResponse } from '../../src/shared/apiContracts/index.js';
 import { demoIndex, fxProblemView, multiCurrencyView } from './fixtures.js';
-import { memorySource, render } from './render.js';
+import { memorySource, render, settle } from './render.js';
 import type { Rendered } from './render.js';
 
 const RECORDED = '2026-11-06T16:00:00.000Z';
@@ -21,6 +23,7 @@ afterEach(() => {
 });
 
 async function show(view: DashboardViewResponse = multiCurrencyView(), kind: 'LIVE' | 'REPLAY' = 'REPLAY') {
+  window.history.replaceState(null, '', viewHref('overview'));
   const r = await render(
     <App
       source={memorySource({
@@ -46,6 +49,13 @@ const click = async (target: HTMLElement): Promise<void> => {
   });
 };
 const card = (c: HTMLElement): HTMLElement | null => c.querySelector('[data-testid="tour-card"]');
+const goto = async (route: ViewId): Promise<void> => {
+  window.history.replaceState(null, '', viewHref(route));
+  await act(async () => {
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+  await settle();
+};
 
 describe('guided tour behaviour', () => {
   it('never starts by itself; the start control is a toggle button', async () => {
@@ -60,12 +70,15 @@ describe('guided tour behaviour', () => {
     const { container } = await show();
     await click(el(container, 'tour-start'));
     expect(el(container, 'tour-start').getAttribute('aria-pressed')).toBe('true');
-    // The section each step sits directly above, in order.
-    // Fintech layout: steps 1-3 above the KPI cards, 4-5 above the visualisation grid, 6 above
-    // the risk-signal cards (every step moves down the page).
-    const expected = ['summary', 'summary', 'summary', 'charts', 'charts', 'panels'];
+    // The section each step sits directly above, in order, on the view the routed tour selects.
+    // Steps 1-3 above the Overview KPI cards, 4 above the allocation section on Portfolio,
+    // 5 above the loss distribution on Risk Analytics, 6 above the risk-signal cards on Signals.
+    const expected = ['summary', 'summary', 'summary', 'allocation', 'charts', 'panels'];
     const titles: string[] = [];
     for (const [i, anchor] of expected.entries()) {
+      expect(window.location.hash, `step ${String(i + 1)} route`).toBe(
+        viewHref(tourView(anchor as Parameters<typeof tourView>[0])),
+      );
       const c = card(container) as HTMLElement;
       expect(c.querySelector('.tour-progress')?.textContent).toBe(`Guided tour · step ${String(i + 1)} of 6`);
       const heading = c.querySelector('h2') as HTMLElement;
@@ -78,9 +91,11 @@ describe('guided tour behaviour', () => {
       const target =
         anchor === 'summary'
           ? next.getAttribute('data-testid') === 'summary'
-          : anchor === 'panels'
-            ? next.classList.contains('panels')
-            : next.getAttribute('data-testid') === 'viz-grid';
+          : anchor === 'allocation'
+            ? next.classList.contains('viz-allocation')
+            : anchor === 'panels'
+              ? next.classList.contains('panels')
+              : next.getAttribute('data-testid') === 'loss-distribution';
       expect(target, `step ${String(i + 1)} sits above ${anchor}`).toBe(true);
       expect(container.querySelectorAll('[data-testid="tour-card"]')).toHaveLength(1);
       if (i < expected.length - 1) await click(el(container, 'tour-next'));
@@ -130,12 +145,25 @@ describe('guided tour behaviour', () => {
     expect(document.activeElement).toBe(el(container, 'tour-start'));
   });
 
-  it('opening the tour leaves every figure unchanged and visible', async () => {
+  it('opening the tour leaves every figure unchanged and visible on its view', async () => {
     const { container } = await show();
     await click(el(container, 'tour-start'));
     expect(el(container, 'summary-nav').textContent).toBe('22375.74 EUR');
+    await goto('signals');
     expect(el(container, 'base-var-value').textContent).toBe('124.10 EUR');
     expect(el(container, 'adjusted-var-value').textContent).toBe('Unavailable');
+  });
+
+  it('navigating away from the tour step ends the tour and focuses the destination heading', async () => {
+    const { container } = await show();
+    await click(el(container, 'tour-start'));
+    expect(card(container)).not.toBeNull();
+    // A manual destination change (not a tour Next) cancels the tour: the card never lingers
+    // on a view it does not describe, and focus lands on the new view's heading.
+    await goto('fx');
+    expect(card(container)).toBeNull();
+    expect(el(container, 'tour-start').getAttribute('aria-pressed')).toBe('false');
+    expect(document.activeElement?.id).toBe('view-fx-title');
   });
 
   it('axe-core finds no violations with the tour open (step 3 shares its topic with the Base VaR panel)', async () => {

@@ -6,6 +6,14 @@ inclusion: always
 
 The Spectral Risk Chimera dashboard is an institutional financial terminal. It should feel calm, dense, and precise. Data comes first, decoration last. These rules apply to everything in `src/web/`. Signal-separation rules come from requirement R35, and the no-calculation rule comes from `architecture.md`.
 
+## Workspace redesign decision
+
+The owner-approved workspace design replaces the earlier in-page navigation with five application destinations: Overview (`#/overview`), Risk Analytics (`#/risk`), Portfolio (`#/portfolio`), Risk Signals (`#/signals`), and FX & Provenance (`#/fx`). Hash URLs must reload on the project Pages subpath without a server fallback. Destinations are links with `aria-current="page"`, not tabs. Only the active view is mounted; navigation must not reload the portfolio snapshot. Preserve focus orientation and browser history.
+
+Overview leads with NAV and Base VaR, followed by positions and gross exposure. Keep the snapshot timestamp explicit and use the server's financial display values. The shared shell identifies recorded demo data as not live; do not repeat the same badge on every preview. Detailed views keep exact values and diagnostics accessible without making them the primary visual hierarchy.
+
+The existing D1–D3 decisions below record the visual foundation. In the workspace, the navy navigation and analytical plot contrast with light content surfaces. Use tabular numerals, compact card padding, and a two-column KPI grid on narrow screens where it fits. Motion should communicate a change of view or control state, never imply changing financial values; disable nonessential motion under reduced-motion preferences.
+
 ## 1. Visual style
 
 Design direction (approved for the modern fintech pass, decisions D1–D3): a premium, modern fintech portfolio-analytics dashboard. It is clear and precise, never a crypto trading terminal.
@@ -137,3 +145,7 @@ An optional, short walkthrough for judges and first-time viewers.
 - [ ] Charts have title, units, axis labels, legend, timestamps, and gaps.
 - [ ] No decorative animation; reduced motion respected.
 - [ ] No financial calculations in components.
+
+## Final acceptance conventions
+
+Keep the navy sidebar and analytical plot on the light canvas, with tabular numerals and dominant NAV/Base VaR. On phones, use the Menu disclosure and confine wide tables to named, keyboard-focusable scroll regions. Keep “Not live” visible even with the replay disclosure closed; put detailed provenance and exact FX rates behind native disclosures. Keep navigation immediate; the desktop sidebar uses a reversible grid-track transition, disabled by reduced-motion preferences. Do not animate or interpolate financial values.
