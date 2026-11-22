@@ -18,9 +18,9 @@ import type { Page } from '@playwright/test';
 const BASE = '/spectral-risk-chimera/';
 const AXE_SOURCE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 /** `--color-accent` on light surfaces (teal #0f766e, ui-guidelines §1) as computed by the browser. */
-const ACCENT = 'rgb(98, 212, 232)';
+const ACCENT = 'rgb(15, 118, 110)';
 /** `--color-accent` inside `.theme-dark` (navy sidebar and chart surface: teal #2ec4b6). */
-const ACCENT_ON_NAVY = 'rgb(98, 212, 232)';
+const ACCENT_ON_NAVY = 'rgb(46, 196, 182)';
 const PHONE = { width: 390, height: 844 };
 
 /**
@@ -75,10 +75,38 @@ const focused = (page: Page): Promise<Focused> =>
     })()`,
   );
 
-async function loaded(page: Page, portfolio?: string): Promise<void> {
-  await page.goto(portfolio === undefined ? BASE : `${BASE}?portfolio=${portfolio}`);
-  await expect(page.getByTestId('base-var-value')).not.toHaveText('');
-  await expect(page.locator('.panels h2')).toHaveCount(4);
+async function loaded(page: Page, portfolio?: string, route = 'overview'): Promise<void> {
+  await page.goto(`${BASE}${portfolio === undefined ? '' : `?portfolio=${portfolio}`}#/${route}`);
+  await expect(page.locator('#portfolio-select')).not.toHaveValue('');
+  const content: Record<string, string> = {
+    overview: '[data-testid=summary-nav]',
+    risk: '[data-testid=loss-chart]',
+    portfolio: '#positions-title',
+    signals: '[data-testid=base-var-value]',
+    fx: '#fx-title',
+  };
+  await expect(page.locator(content[route] ?? content['overview'] ?? '#main')).toBeVisible();
+  if (route === 'risk') {
+    // The chart measures its container with a ResizeObserver after the first paint: the wide
+    // frame renders first and the compact frame lands a frame later. Wait for the geometry
+    // to settle before any layout assertion, so the test never reads the transient frame.
+    await expect
+      .poll(() =>
+        inPage<boolean>(
+          page,
+          `(() => {
+            const wrap = document.querySelector('[data-testid="loss-distribution"] .chart-wrap');
+            if (wrap === null) return false;
+            const svg = wrap.querySelector('svg');
+            if (svg === null) return false;
+            const compact = svg.classList.contains('loss-chart-compact');
+            const compactExpected = wrap.clientWidth < 600;
+            return compact === compactExpected;
+          })()`,
+        ),
+      )
+      .toBe(true);
+  }
 }
 
 test.describe('accessibility in a real browser (axe-core, all default rules)', () => {
@@ -94,14 +122,18 @@ test.describe('accessibility in a real browser (axe-core, all default rules)', (
     for (const portfolio of ['demo-eur-usd-gbp', 'demo-eur-only']) {
       test(`${portfolio} at ${name}: no violations, including colour contrast`, async ({ page }) => {
         await page.setViewportSize(viewport);
-        await loaded(page, portfolio);
-        const result = await runAxe(page);
-        expect(result.violations).toEqual([]);
-        // The contrast rule really evaluated the rendered page (not "inapplicable").
-        expect(result.passed).toContain('color-contrast');
-        expect(result.passed).toContain('page-has-heading-one');
-        // Tables overflow (and so the rule applies) only on the narrow viewport.
-        if (viewport.width === PHONE.width) expect(result.passed).toContain('scrollable-region-focusable');
+        for (const route of ['overview', 'risk', 'portfolio', 'signals', 'fx']) {
+          await loaded(page, portfolio, route);
+          const result = await runAxe(page);
+          expect(result.violations).toEqual([]);
+          // The contrast rule really evaluated the rendered page (not "inapplicable").
+          expect(result.passed).toContain('color-contrast');
+          expect(result.passed).toContain('page-has-heading-one');
+          // Tables overflow (and so the rule applies) only on the narrow viewport.
+          if (viewport.width === PHONE.width && route === 'portfolio') {
+            expect(result.passed).toContain('scrollable-region-focusable');
+          }
+        }
       });
     }
   }
@@ -113,7 +145,7 @@ test.describe('390 px phone viewport', () => {
   test('no page-level horizontal overflow; the four panels stack in their required order', async ({
     page,
   }) => {
-    await loaded(page);
+    await loaded(page, undefined, 'signals');
     const overflow = await inPage<{ scrollWidth: number; innerWidth: number }>(
       page,
       '({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth })',
@@ -155,13 +187,17 @@ test.describe('390 px phone viewport', () => {
       expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(PHONE.width);
     }
     // The key values stay readable and labelled on the phone.
-    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+    await loaded(page);
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
     await expect(page.getByTestId('summary-nav')).toHaveText('22375.74 EUR');
-    await expect(page.getByTestId('summary-badges')).toContainText('DEMO DATA');
+    // The badge renders an aria-hidden icon before its label, so match the badge's full text.
+    await expect(
+      page.locator('header.topbar').getByText('RECORDED REPLAY · Not live', { exact: true }),
+    ).toBeVisible();
   });
 
   test('wide tables scroll inside their own container, not the page', async ({ page }) => {
-    await loaded(page);
+    await loaded(page, undefined, 'portfolio');
     const list = await inPage<{ overflowX: string; right: number }[]>(
       page,
       `Array.from(document.querySelectorAll('.table-wrap')).map((e) => ({
@@ -188,7 +224,7 @@ test.describe('390 px phone viewport', () => {
   test('A2: the loss chart keeps readable text and scrolls inside its own focusable region', async ({
     page,
   }) => {
-    await loaded(page);
+    await loaded(page, undefined, 'risk');
     const chart = page.getByRole('region', { name: 'Loss distribution chart, scrollable' });
     await chart.focus();
     // The loss chart sits on the navy chart surface, where the accent is the lighter teal.
@@ -266,7 +302,7 @@ test.describe('loss chart responsive geometry (regression)', () => {
       page,
     }) => {
       await page.setViewportSize({ width, height: 900 });
-      await loaded(page);
+      await loaded(page, undefined, 'risk');
       const m = await metrics(page);
       expect(m.doc, 'document overflow').toBeLessThanOrEqual(0);
       expect(m.card, 'chart card overflow').toBeLessThanOrEqual(0);
@@ -295,7 +331,7 @@ test.describe('loss chart responsive geometry (regression)', () => {
 
   test('resizing after the first render switches between the wide and compact geometry', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await loaded(page);
+    await loaded(page, undefined, 'risk');
     const viewBox = () => page.getByTestId('loss-chart').getAttribute('viewBox');
     expect(await viewBox()).toBe('0 0 640 360');
     for (const [width, compact] of [
@@ -332,19 +368,20 @@ test.describe('keyboard', () => {
       outlineColor: ACCENT,
       outlineWidth: '2px',
     });
-    // Then the sidebar's section links, in order, with the navy-surface focus ring.
-    for (const label of [
-      'Overview',
-      'Loss distribution',
-      'Allocation',
-      'Risk signals',
-      'Positions',
-      'Currency and FX',
-    ]) {
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Collapse sidebar' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.workspace-provenance summary')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.workspace-provenance')).toHaveAttribute('open', '');
+    await expect(page.locator('.replay-note')).toBeVisible();
+    await page.keyboard.press('Enter');
+    for (const label of ['Overview', 'Risk Analytics', 'Portfolio', 'Risk Signals', 'FX & Provenance']) {
       await page.keyboard.press('Tab');
-      expect(await focused(page), label).toMatchObject({
-        tag: 'a',
-        text: label,
+      const focusedLink = await focused(page);
+      expect(focusedLink.tag, label).toBe('a');
+      expect((focusedLink.text ?? '').endsWith(label), label).toBe(true);
+      expect(focusedLink, label).toMatchObject({
         outlineStyle: 'solid',
         outlineColor: ACCENT_ON_NAVY,
       });
@@ -369,7 +406,7 @@ test.describe('keyboard', () => {
     await loaded(page);
     await page.keyboard.press('Tab');
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/#main$/);
+    await expect(page).toHaveURL(/#\/overview$/);
     expect((await focused(page)).id).toBe('main');
   });
 
@@ -377,8 +414,8 @@ test.describe('keyboard', () => {
     await loaded(page);
     await page.locator('#portfolio-select').focus();
     await page.keyboard.press('ArrowDown');
-    await expect(page).toHaveURL(/\?portfolio=demo-eur-only$/);
-    await expect(page.getByTestId('base-var-value')).toHaveText('140.18 EUR');
+    await expect(page).toHaveURL(/\?portfolio=demo-eur-only#\/overview$/);
+    await expect(page.getByTestId('summary-base-var')).toHaveText('140.18 EUR');
   });
 });
 
@@ -396,7 +433,7 @@ test.describe('reduced motion', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await loaded(page);
     expect(await transition(page)).toBe('0s');
-    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
     expect(await inPage<number>(page, 'document.getAnimations().length')).toBe(0);
   });
 });

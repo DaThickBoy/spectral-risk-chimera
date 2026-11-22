@@ -1,6 +1,6 @@
-// Top bar (ui-guidelines 3): identity, portfolio selection, data mode, data source, and run mode,
-// always visible. NAV, exposure, as-of time, and freshness are the headline summary below it
-// (Summary.tsx). Kiroween identity is a small static mark and a label only.
+import { useState } from 'react';
+import { VIEWS, viewHref } from '../router.js';
+import type { ViewId } from '../router.js';
 import type { ReactElement } from 'react';
 import type { DashboardIndexResponse, DashboardViewResponse } from '../../shared/apiContracts/index.js';
 import type { StreamState } from '../data/liveUpdates.js';
@@ -26,16 +26,6 @@ function ChimeraMark(): ReactElement {
     </svg>
   );
 }
-
-/** Sidebar links: each targets an existing section heading's id. */
-const SECTIONS: readonly (readonly [string, string])[] = [
-  ['#summary-title', 'Overview'],
-  ['#loss-title', 'Loss distribution'],
-  ['#allocation-heading', 'Allocation'],
-  ['#base-var-title', 'Risk signals'],
-  ['#positions-title', 'Positions'],
-  ['#ccy-title', 'Currency and FX'],
-];
 
 const STREAM_BADGE: Readonly<Record<StreamState, { tone: BadgeTone; label: string }>> = {
   CONNECTING: { tone: 'neutral', label: 'STREAM CONNECTING' },
@@ -76,6 +66,9 @@ function LiveStatus(props: { readonly refreshError: LoadError | undefined }): Re
 }
 
 export function TopBar(props: {
+  readonly view: ViewId;
+  readonly collapsed: boolean;
+  readonly onCollapse: () => void;
   readonly source: SourceInfo | undefined;
   readonly index: DashboardIndexResponse | undefined;
   readonly selected: string | undefined;
@@ -89,9 +82,8 @@ export function TopBar(props: {
   readonly tourActive: boolean;
 }): ReactElement {
   const { data } = props;
-  // Fintech redesign: the navy sidebar (header.topbar) carries identity and every provenance
-  // item; the light page header carries the title and controls. DOM order is unchanged:
-  // identity first, then the controls, so the keyboard order stays skip link, selector, Reload.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const active = VIEWS.find(({ id }) => id === props.view) ?? VIEWS[0];
   const controls = (
     <div className="topbar-controls">
       <label htmlFor="portfolio-select">Portfolio</label>
@@ -125,65 +117,112 @@ export function TopBar(props: {
   );
   return (
     <>
-      <header className="topbar theme-dark">
+      <header
+        className="topbar theme-dark workspace-sidebar"
+        data-menu-open={menuOpen}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && menuOpen) {
+            setMenuOpen(false);
+            document.getElementById('workspace-menu-toggle')?.focus();
+          }
+        }}
+      >
         <div className="brand">
           <ChimeraMark />
           <div>
-            <h1 className="brand-name">Spectral Risk Chimera</h1>
-            <p className="brand-tag">Kiroween 2026 · Frankenstein build · monitoring only, no trading</p>
+            <p className="brand-name">Spectral Risk Chimera</p>
+            <p className="brand-tag">Kiroween 2026 · Monitoring only, no trading</p>
           </div>
         </div>
-        <dl className="topbar-facts" aria-label="Data status">
-          <div>
-            <dt>Data</dt>
-            <dd>
-              {data === undefined ? (
-                MISSING
-              ) : (
-                <Badge tone={toneOf(data.dataMode)} label={data.dataMode === 'DEMO' ? 'DEMO DATA' : 'REAL'} />
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Source</dt>
-            <dd>
-              {props.source === undefined ? (
-                MISSING
-              ) : props.source.kind === 'REPLAY' ? (
-                <>
-                  <Badge tone="info" label="RECORDED REPLAY" title="Recorded responses, not live data" />{' '}
-                  recorded {utcText(props.source.recordedAt ?? null)}
-                </>
-              ) : (
-                <>
-                  Live local backend <LiveStatus refreshError={props.refreshError} />
-                </>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Mode</dt>
-            <dd>{data === undefined ? MISSING : codeLabel(data.runMode)}</dd>
-          </div>
-        </dl>
-        {props.source?.note !== undefined ? <p className="replay-note">{props.source.note}</p> : null}
-        {/* In-page links to the dashboard's existing section headings (only once they exist).
-            Hidden on narrow screens, where the sidebar is a compact header. */}
-        {data === undefined ? null : (
-          <nav className="sidebar-nav" aria-label="Dashboard sections">
-            <ul>
-              {SECTIONS.map(([href, label]) => (
-                <li key={href}>
-                  <a href={href}>{label}</a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
+        <button
+          type="button"
+          className="workspace-collapse"
+          aria-controls="workspace-nav"
+          aria-label={props.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={props.onCollapse}
+        >
+          <span aria-hidden="true">{props.collapsed ? '»' : '«'}</span>
+        </button>
+        <button
+          type="button"
+          id="workspace-menu-toggle"
+          className="workspace-menu-toggle"
+          aria-controls="workspace-nav"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          Menu
+        </button>
+        <details className="workspace-provenance">
+          <summary>{props.source?.kind === 'REPLAY' ? 'RECORDED REPLAY · Not live' : 'Data status'}</summary>
+          <dl className="topbar-facts" aria-label="Data status">
+            <div>
+              <dt>Data</dt>
+              <dd>
+                {data === undefined ? (
+                  MISSING
+                ) : (
+                  <Badge
+                    tone={toneOf(data.dataMode)}
+                    label={data.dataMode === 'DEMO' ? 'DEMO DATA' : 'REAL'}
+                  />
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Source</dt>
+              <dd>
+                {props.source === undefined ? (
+                  MISSING
+                ) : props.source.kind === 'REPLAY' ? (
+                  <>
+                    <Badge tone="info" label="RECORDED REPLAY" title="Recorded responses, not live data" />{' '}
+                    recorded {utcText(props.source.recordedAt ?? null)}
+                  </>
+                ) : (
+                  <>
+                    Live local backend <LiveStatus refreshError={props.refreshError} />
+                  </>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Mode</dt>
+              <dd>{data === undefined ? MISSING : codeLabel(data.runMode)}</dd>
+            </div>
+          </dl>
+          {props.source?.note !== undefined ? <p className="replay-note">{props.source.note}</p> : null}
+        </details>
+        <nav className="sidebar-nav" id="workspace-nav" aria-label="Dashboard views">
+          <ul>
+            {VIEWS.map(({ id, label, icon }) => (
+              <li key={id}>
+                <a
+                  href={viewHref(id)}
+                  aria-current={id === props.view ? 'page' : undefined}
+                  aria-label={label}
+                  title={label}
+                  onClick={() => {
+                    if (menuOpen && id === props.view)
+                      document.getElementById('workspace-menu-toggle')?.focus();
+                    setMenuOpen(false);
+                  }}
+                >
+                  <span className="workspace-nav-icon" aria-hidden="true">
+                    {icon}
+                  </span>
+                  <span className="workspace-nav-label">{label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </header>
-      <div className="page-header" role="region" aria-label="Portfolio overview and controls">
+      <div className="page-header" role="region" aria-label="Workspace controls">
         <div>
-          <p className="page-title">Portfolio overview</p>
+          <h1 id={`view-${props.view}-title`} className="page-title" tabIndex={-1}>
+            {active.label}
+          </h1>
           <p className="page-subtitle">
             {data === undefined
               ? 'Loading portfolio data'

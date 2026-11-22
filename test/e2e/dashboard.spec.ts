@@ -74,26 +74,36 @@ test.describe('dark quantitative workspace', () => {
         await expect(page.getByTestId('loss-summary')).toContainText(
           'The orange bucket containing the marker may include scenarios at or below it.',
         );
+        await page.goto(`${BASE}?portfolio=${portfolio}#/portfolio`);
         await expect(page.getByTestId('allocation-remainder-note')).toContainText(
           'Cash balance: 1000.00 EUR',
         );
+        await page.goto(`${BASE}?portfolio=${portfolio}#/signals`);
         await expect(panel(page, 'Market Sentiment')).toContainText('DEMO OBSERVATION');
         await expect(panel(page, 'Market Sentiment')).toContainText(
           'Demo observations are synthetic and do not influence risk calculations.',
         );
-        await expect(page.getByRole('navigation', { name: 'Dashboard sections' })).toBeVisible();
+        await page.goto(`${BASE}?portfolio=${portfolio}#/overview`);
+        // Below 1024 px the sidebar navigation is behind the Menu disclosure; open it first.
+        const navigation = page.getByRole('navigation', { name: 'Dashboard views' });
+        if (width < 1024) {
+          await expect(navigation).toBeHidden();
+          await page.getByRole('button', { name: 'Menu', exact: true }).click();
+        }
+        await expect(navigation).toBeVisible();
         const metrics = (await page.evaluate(`(() => ({
           overflow: document.documentElement.scrollWidth - innerWidth,
           navSize: parseFloat(getComputedStyle(document.querySelector('[data-testid="summary-nav"]')).fontSize),
           varSize: parseFloat(getComputedStyle(document.querySelector('[data-testid="summary-base-var"]')).fontSize),
-          titleSize: parseFloat(getComputedStyle(document.querySelector('.page-title')).fontSize)
+          titleSize: parseFloat(getComputedStyle(document.querySelector('#view-overview-title')).fontSize)
         }))()`)) as { overflow: number; navSize: number; varSize: number; titleSize: number };
         expect(metrics.overflow).toBeLessThanOrEqual(0);
         expect(metrics.navSize).toBeGreaterThanOrEqual(30);
         expect(metrics.varSize).toBeGreaterThanOrEqual(28);
         expect(metrics.titleSize).toBeGreaterThanOrEqual(30);
-        await page.getByRole('link', { name: 'Currency and FX', exact: true }).click();
-        await expect(page).toHaveURL(/#ccy-title$/);
+        await page.getByRole('link', { name: 'FX & Provenance', exact: true }).click();
+        await expect(page).toHaveURL(/#\/fx$/);
+        await expect(page.getByRole('heading', { level: 1, name: 'FX & Provenance' })).toBeVisible();
         expectClean(observed);
       });
     }
@@ -107,7 +117,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
   }) => {
     const w = watch(page);
     await page.goto(BASE);
-    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
 
     const bar = page.locator('header.topbar');
     await expect(bar).toContainText('RECORDED REPLAY');
@@ -120,7 +130,9 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     await expect(summary).toContainText('Fresh at replay time');
     await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
     await expect(page.locator('.replay-note')).toContainText('Recorded DEMO replay');
-    await expect(page.locator('.demo-banner')).toContainText('DEMO DATA');
+    await expect(bar).toContainText('DEMO DATA');
+    await page.goto(`${BASE}#/signals`);
+    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
 
     await expect(page.locator('.panels h2')).toHaveText([
       'Base VaR',
@@ -135,8 +147,6 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     await expect(panel(page, 'Sentiment-Adjusted VaR')).toContainText('1 day · 95% · as of 2026-11-06');
     await expect(panel(page, 'Market Sentiment')).toContainText('as of 2026-11-06 16:00 UTC');
     await expect(panel(page, 'SEC Filing Risk')).toContainText('as of \u2014 (not configured)');
-    await expect(page.getByTestId('summary-nav')).toHaveText('22375.74 EUR');
-    await expect(page.getByTestId('summary-badges')).toContainText('DEMO DATA');
 
     const adjusted = panel(page, 'Sentiment-Adjusted VaR');
     await expect(adjusted.getByTestId('adjusted-var-value')).toHaveText('Unavailable');
@@ -146,6 +156,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
 
     await expect(panel(page, 'SEC Filing Risk')).toContainText('NOT CONFIGURED');
 
+    await page.goto(`${BASE}#/portfolio`);
     const positions = page.locator('section', {
       has: page.getByRole('heading', { name: 'Positions and allocation' }),
     });
@@ -154,6 +165,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     await expect(positions).toContainText('5726.32 EUR');
     await expect(positions).toContainText('40.20%');
 
+    await page.goto(`${BASE}#/fx`);
     // ECB: published observation versus derived inverse rate (OD-20).
     await expect(page.getByTestId('derived-USD')).toHaveText(
       'Derived: 1 / published EUR→USD (40 significant digits, ROUND HALF UP)',
@@ -180,7 +192,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
       ['demo-eur-usd-gbp', '124.10', '124.095376636618777169053781414066570861'],
       ['demo-eur-only', '140.18', '140.1806869978253353800812193977189520388'],
     ] as const) {
-      await page.goto(`${BASE}?portfolio=${portfolio}`);
+      await page.goto(`${BASE}?portfolio=${portfolio}#/risk`);
       const loss = page.getByTestId('loss-distribution');
       await expect(loss.getByRole('heading', { level: 2 })).toHaveText(
         'Loss distribution · Base VaR scenarios · 1 day · 95% · Historical Simulation · as of 2026-11-06 16:00 UTC',
@@ -195,13 +207,15 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
       await expect(rows).toHaveCount(20);
       // The marker bucket names the exact, unrounded raw quantile (the Base VaR panel shows it too).
       await expect(rows.nth(19)).toContainText(`VaR 95% at ${raw}`);
-      await expect(panel(page, 'Base VaR')).toContainText(raw);
       await expect(page.getByTestId('loss-summary')).toContainText(
         '250 scenarios from returns ending 2025-11-24 to 2026-11-06 (UTC dates), in 20 buckets',
       );
       await expect(page.getByTestId('loss-summary')).toContainText(
         '13 of 250 scenarios exceeded the VaR marker.',
       );
+      // The same exact quantile appears in the Base VaR panel on Risk Signals.
+      await page.goto(`${BASE}?portfolio=${portfolio}#/signals`);
+      await expect(panel(page, 'Base VaR')).toContainText(raw);
     }
   });
 
@@ -225,7 +239,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
         ],
       ],
     ] as const) {
-      await page.goto(`${BASE}?portfolio=${portfolio}`);
+      await page.goto(`${BASE}?portfolio=${portfolio}#/signals`);
       const sentiment = panel(page, 'Market Sentiment');
       await expect(sentiment).toContainText('-1 (bearish) to +1 (bullish)');
       await expect(sentiment).toContainText('Scale: -1 bearish to +1 bullish');
@@ -255,35 +269,41 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
   }) => {
     const w = watch(page);
     await page.goto(BASE);
-    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
     await page.locator('#portfolio-select').selectOption('demo-eur-only');
     await expect(page).toHaveURL(/\?portfolio=demo-eur-only$/);
-    await expect(page.getByTestId('base-var-value')).toHaveText('140.18 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('140.18 EUR');
     await expect(page.getByTestId('summary-nav')).toHaveText('14025.44 EUR');
-    // Only the identity rate: nothing depends on the ECB.
+    // Only the identity rate: nothing depends on the ECB (FX rates live in their own view).
+    await page.goto(`${BASE}?portfolio=demo-eur-only#/fx`);
     const fx = page.locator('section', { has: page.getByRole('heading', { name: 'FX rates used' }) });
     await expect(fx.locator('tbody tr')).toHaveCount(1);
     await expect(fx).toContainText('Identity (base currency)');
 
     await page.reload();
-    await expect(page.getByTestId('base-var-value')).toHaveText('140.18 EUR');
+    await expect(page).toHaveURL(/portfolio=demo-eur-only#\/fx$/);
+    await expect(fx.locator('tbody tr')).toHaveCount(1);
     await page.goBack();
-    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+    await expect(page).toHaveURL(/\?portfolio=demo-eur-only$/);
+    await expect(page.getByTestId('summary-base-var')).toHaveText('140.18 EUR');
+    await page.goBack();
+    await expect(page).toHaveURL(/\/spectral-risk-chimera\/$/);
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
     await page.goForward();
-    await expect(page.getByTestId('base-var-value')).toHaveText('140.18 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('140.18 EUR');
     expectClean(w);
   });
 
   test('direct navigation: a deep link, and the subpath without its trailing slash', async ({ page }) => {
     const w = watch(page);
     await page.goto(`${BASE}?portfolio=demo-eur-only`);
-    await expect(page.getByTestId('base-var-value')).toHaveText('140.18 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('140.18 EUR');
     const response = await page.goto(BASE.slice(0, -1));
     expect(response?.url()).toMatch(/\/spectral-risk-chimera\/$/);
-    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
     // Unknown portfolio in the URL: the first listed portfolio is shown instead of nothing.
     await page.goto(`${BASE}?portfolio=no-such-portfolio`);
-    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
     expect(w.consoleErrors).toEqual([]);
   });
 
@@ -306,7 +326,7 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
     // The static server has no write route.
     expect((await request.post(`${BASE}replay/manifest.json`)).status()).toBe(405);
     await page.goto(BASE);
-    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
   });
 
   for (const viewport of [
@@ -345,6 +365,8 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
       await page.keyboard.press('Escape');
       await expect(card).toHaveCount(0);
       await expect(page.getByTestId('tour-start')).toBeFocused();
+      // The tour ends on Risk Signals; the recorded figure is unchanged there.
+      await expect(page).toHaveURL(/#\/signals$/);
       await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
       expectClean(w);
     });
@@ -376,7 +398,9 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
           for (const line of await card.locator('.tour-line').all()) {
             await expect(line, 'step 4 explanation').toBeInViewport({ ratio: 1 });
           }
-          await expect(card).toContainText('fixed 0–100 % axis');
+          await expect(card).toContainText(
+            'ring or ranked bars show each position’s allocation'.replace('’', "'"),
+          );
         }
         if (step < 6) await page.getByTestId('tour-next').click();
       }
@@ -401,26 +425,37 @@ test.describe('recorded replay under the GitHub Pages subpath', () => {
       const m = (await page.evaluate(`(() => {
         const nav = document.querySelector('[data-testid="summary-nav"]');
         const bv = document.querySelector('[data-testid="summary-base-var"]');
-        const fig = bv.closest('.summary-figure');
+        const navCard = nav.closest('.overview-kpi');
+        const varCard = bv.closest('.overview-kpi');
         const text = (el) => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect(); };
         return {
           navPx: parseFloat(getComputedStyle(nav).fontSize),
           varPx: parseFloat(getComputedStyle(bv).fontSize),
           gap: text(bv).left - text(nav).right,
           sameRow: Math.abs(text(bv).top - text(nav).top) < 20,
-          divider: getComputedStyle(fig).borderLeftStyle,
+          cardBorder: getComputedStyle(varCard).borderTopStyle,
+          separateCards: navCard !== varCard && !navCard.contains(varCard),
         };
-      })()`)) as { navPx: number; varPx: number; gap: number; sameRow: boolean; divider: string };
+      })()`)) as {
+        navPx: number;
+        varPx: number;
+        gap: number;
+        sameRow: boolean;
+        cardBorder: string;
+        separateCards: boolean;
+      };
       expect(m.varPx).toBeLessThan(m.navPx); // NAV primary, Base VaR secondary
+      expect(m.navPx).toBeGreaterThanOrEqual(30);
+      expect(m.varPx).toBeGreaterThanOrEqual(28);
+      expect(m.separateCards).toBe(true); // never one merged figure
+      expect(m.cardBorder).toBe('solid'); // each KPI keeps its own card border
       if (viewport.width === 1440) {
         expect(m.sameRow).toBe(true);
-        expect(m.divider).toBe('solid');
         expect(m.gap).toBeGreaterThanOrEqual(40); // was about 23 px before the review fix
       } else {
-        // Fintech redesign: on the phone NAV and Base VaR are separate full-width KPI cards,
-        // stacked, each with its own card border.
+        // Workspace redesign: on the phone NAV and Base VaR are separate full-width KPI cards,
+        // stacked, so the large numerals never wrap in a half-width column.
         expect(m.sameRow).toBe(false);
-        expect(m.divider).toBe('none');
       }
     });
   }
@@ -441,6 +476,7 @@ test.describe('loss distribution layout', () => {
         const summary = page.getByTestId('loss-summary');
         const details = page.getByTestId('loss-table-details');
         await expect(summary).toContainText('VaR 95% marker at');
+        await expect(summary).toContainText('13 of 250 scenarios exceeded the VaR marker.');
         const c = await chart.boundingBox();
         const s = await summary.boundingBox();
         if (c === null || s === null) throw new Error('missing layout boxes');
@@ -460,7 +496,8 @@ test.describe('loss distribution layout', () => {
         await details.locator('summary').focus();
         await page.keyboard.press('Enter');
         await expect(details).toHaveAttribute('open', '');
-        await expect(page.locator('#loss-exact-hint')).toBeVisible();
+        // The hint id is React-generated; assert the visible hint inside the disclosure instead.
+        await expect(details.locator('.exact-hint')).toContainText('Full precision, unrounded');
         await expect(
           page.getByRole('region', { name: 'Exact loss distribution values, scrollable' }),
         ).toBeVisible();
@@ -523,12 +560,20 @@ test.describe('states', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(variant) }),
     );
     await page.goto(BASE);
-    await expect(page.getByTestId('base-var-value')).toHaveText('\u2014');
-    await expect(panel(page, 'Base VaR')).toContainText('Unavailable: FX UNAVAILABLE');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('\u2014');
     await expect(page.getByTestId('summary-badges')).toContainText('FX UNAVAILABLE');
+    // The compact overview preview keeps the honest unavailable state: a reason, never zero bars.
+    const preview = page.getByTestId('loss-distribution');
+    await expect(preview).toContainText('Unavailable (BASE VAR UNAVAILABLE)');
+    await expect(preview.locator('svg')).toHaveCount(0);
+    await expect(preview.locator('table')).toHaveCount(0);
+    await page.goto(`${BASE}#/signals`);
+    await expect(panel(page, 'Base VaR')).toContainText('Unavailable: FX UNAVAILABLE');
+    await page.goto(`${BASE}#/fx`);
     const fx = page.locator('section', { has: page.getByRole('heading', { name: 'FX rates used' }) });
     await expect(fx).toContainText('STALE');
     await expect(fx).toContainText('PROVIDER ERROR');
+    await page.goto(`${BASE}#/risk`);
     const loss = page.getByTestId('loss-distribution');
     await expect(loss).toContainText('Unavailable (BASE VAR UNAVAILABLE)');
     await expect(loss.locator('svg')).toHaveCount(0);
@@ -547,7 +592,7 @@ test.describe('states', () => {
     await page.goto(BASE);
     await expect(page.getByRole('status')).toHaveText('Loading portfolio data…');
     release();
-    await expect(page.getByTestId('base-var-value')).toHaveText('124.10 EUR');
+    await expect(page.getByTestId('summary-base-var')).toHaveText('124.10 EUR');
   });
 
   test('a missing replay is explained, not shown as data', async ({ page }) => {

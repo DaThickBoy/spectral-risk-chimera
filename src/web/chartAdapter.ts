@@ -15,9 +15,13 @@
  * - The numbers returned here are geometry. They are never shown as values, sent to the API,
  *   stored, or used in a financial calculation. Every label and tooltip uses the backend's
  *   decimal and display strings.
+ *
+ * Ordering and eligibility helpers below compare the backend's exact decimal text with the
+ * shared decimal type (no native-number comparison of money) and return order or booleans,
+ * never a new financial value.
  */
 import type { LossDistribution } from '../shared/apiContracts/index.js';
-import { toChartNumber } from '../shared/decimal.js';
+import { d, toChartNumber } from '../shared/decimal.js';
 import type { DecimalString } from '../shared/decimal.js';
 
 export type AvailableLossDistribution = Extract<LossDistribution, { status: 'AVAILABLE' }>;
@@ -202,4 +206,31 @@ export function exposureBars(
       return { currency, widthPct: null, negative, notPlotted: 'OUT_OF_SCALE' };
     return { currency, widthPct: (length / axis) * 100, negative, notPlotted: null };
   });
+}
+
+/**
+ * Exact ordering of two backend decimal texts (-1, 0, 1). Nulls are handled by the caller;
+ * this compares money and percentages without converting them to native numbers.
+ */
+export function compareDecimalText(left: DecimalString, right: DecimalString): number {
+  return d(left).comparedTo(d(right));
+}
+
+/**
+ * Exact decimal eligibility for the long-only allocation ring: cash is non-negative, every
+ * position is long, and gross exposure does not exceed NAV. Comparisons use the shared
+ * decimal type on the backend's text; nothing is recomputed. Bar-level plot eligibility
+ * (count, minimum slice width) stays with the component's chart geometry.
+ */
+export function longOnlyWithinNav(
+  exposure: {
+    readonly cash: DecimalString;
+    readonly gross: DecimalString | null;
+    readonly nav: DecimalString | null;
+  },
+  assets: readonly { readonly signedQuantity: DecimalString }[],
+): boolean {
+  const { cash, gross, nav } = exposure;
+  if (gross === null || nav === null) return false;
+  return d(cash).gte('0') && d(gross).lte(nav) && assets.every((asset) => d(asset.signedQuantity).gt('0'));
 }

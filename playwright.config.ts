@@ -4,7 +4,8 @@
 // access beyond 127.0.0.1. Chromium only, to keep the browser stack small.
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4173;
+const PORT = Number(process.env['PLAYWRIGHT_PORT'] ?? '4173');
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error('Invalid Playwright port');
 export const PAGES_BASE = '/spectral-risk-chimera/';
 
 export default defineConfig({

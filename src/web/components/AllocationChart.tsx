@@ -1,10 +1,7 @@
-// Allocation chart (roadmap S2): one horizontal bar per position on a fixed 0–100 % axis, in the
-// backend's position order. Labels are the backend's exact allocation text (padded only, as in
-// the positions table); bar widths come from the chart adapter. A missing allocation has no bar
-// and says why, never a zero-length bar. The positions table below stays the exact-value table.
+// Use the backend percentages as labels. Geometry comes from the chart adapter.
 import type { ReactElement } from 'react';
 import type { DashboardViewResponse } from '../../shared/apiContracts/index.js';
-import { allocationArcs, allocationBars } from '../chartAdapter.js';
+import { allocationArcs, allocationBars, compareDecimalText, longOnlyWithinNav } from '../chartAdapter.js';
 import { codeLabel, percentText, withUnit } from '../format.js';
 import { Badge, toneOf } from './Badge.tsx';
 
@@ -18,13 +15,25 @@ const RING = { center: 110, radius: 84, labelRadius: 84 } as const;
 export function AllocationChart({ data }: { readonly data: View }): ReactElement {
   const assets = data.view.assets;
   const values = new Map(data.display.assets.map((asset) => [asset.ticker, asset.marketValueBase]));
+  const ranked = [...assets].sort((a, b) => {
+    const left = a.allocationPct;
+    const right = b.allocationPct;
+    const tickerOrder = a.ticker < b.ticker ? -1 : a.ticker > b.ticker ? 1 : 0;
+    if (left === null || right === null) {
+      return left === right ? tickerOrder : left === null ? 1 : -1;
+    }
+    return compareDecimalText(right, left) || tickerOrder;
+  });
   const bars = allocationBars(assets);
   const none = bars.every((bar) => bar.notPlotted === 'UNAVAILABLE');
-  // Fintech redesign: when every position is plotted on the 0–100 % axis, show the allocation
-  // ring (one numbered arc per position, from the same adapter widths) with a labelled legend of
-  // the exact backend percentages. Any missing or off-scale allocation falls back to one bar per
-  // position, so nothing is ever drawn as zero.
-  const composition = !none && bars.every((bar) => bar.notPlotted === null && bar.widthPct !== null);
+  const { cash, gross, nav } = data.view.exposure;
+  // The track may represent cash only for an eligible long-only allocation. Prefer ranked bars
+  // when slices cannot be individually labelled, exceed the palette, or are unavailable.
+  const composition =
+    !none &&
+    longOnlyWithinNav({ cash, gross, nav }, assets) &&
+    bars.length <= SEQUENCE &&
+    bars.every((bar) => bar.notPlotted === null && bar.widthPct !== null && bar.widthPct >= 6);
   // Arc geometry from the same adapter widths (pixels only); empty when bars are shown instead.
   const arcs = composition ? allocationArcs(bars, RING) : [];
   return (
@@ -125,9 +134,9 @@ export function AllocationChart({ data }: { readonly data: View }): ReactElement
           </ul>
         </>
       ) : (
-        <ul className="allocation-bars">
-          {bars.map((bar, i) => {
-            const asset = assets[i];
+        <ol className="allocation-bars" aria-label="Positions ordered by allocation, largest first">
+          {allocationBars(ranked).map((bar, i) => {
+            const asset = ranked[i];
             if (asset === undefined) return null;
             return (
               <li key={bar.ticker} className="allocation-row" data-testid={`allocation-${bar.ticker}`}>
@@ -156,7 +165,13 @@ export function AllocationChart({ data }: { readonly data: View }): ReactElement
               </li>
             );
           })}
-        </ul>
+        </ol>
+      )}
+      {none || composition ? null : (
+        <p className="caption allocation-cash-note">
+          Cash balance: {withUnit(data.display.exposure.cash, data.display.currency)} (not plotted; the bars
+          show each position&apos;s allocation of NAV).
+        </p>
       )}
     </figure>
   );

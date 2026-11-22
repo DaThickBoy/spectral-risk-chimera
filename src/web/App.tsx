@@ -2,7 +2,7 @@ import { ReplayContext } from './components/Badge.tsx';
 // Dashboard shell (tasks 17.2, 17.3): loads the portfolio list and one portfolio view through the
 // injected data source (live backend or recorded replay), and shows loading, error, and data
 // states. Reload is manual: there is no polling and no background retrieval.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import type { DashboardIndexResponse, DashboardViewResponse } from '../shared/apiContracts/index.js';
 import { AllocationChart } from './components/AllocationChart.tsx';
@@ -12,7 +12,9 @@ import { CurrencyExposureSection, FxSection, PositionsSection } from './componen
 import { SummarySection } from './components/Summary.tsx';
 import { TopBar } from './components/TopBar.tsx';
 import { TourCard } from './components/TourCard.tsx';
-import { tourSteps } from './tour.js';
+import './shell.css';
+import { useView, viewHref } from './router.js';
+import { tourSteps, tourView } from './tour.js';
 import type { TourAnchor } from './tour.js';
 import type { LiveUpdateFactory, LiveUpdates } from './data/liveUpdates.js';
 import type { DashboardDataSource, LoadError, SourceInfo } from './data/source.js';
@@ -58,6 +60,8 @@ export function App({
   /** LIVE mode only (task 17.4): creates the stream-driven updates. Ignored for the replay. */
   readonly liveUpdates?: LiveUpdateFactory;
 }): ReactElement {
+  const [route, navigate] = useView();
+  const [collapsed, setCollapsed] = useState(false);
   const [info, setInfo] = useState<SourceInfo | undefined>(undefined);
   const [index, setIndex] = useState<DashboardIndexResponse | undefined>(undefined);
   const [indexError, setIndexError] = useState<LoadError | undefined>(undefined);
@@ -83,8 +87,21 @@ export function App({
       }),
     [url],
   );
-  const [view, setView] = useState<ViewState>({ status: 'loading' });
   const [generation, setGeneration] = useState(0); // a reload counter, not a financial value
+  const request = useMemo(() => ({ source, selected, generation }), [source, selected, generation]);
+  const requestRef = useRef(request);
+  requestRef.current = request;
+  const [result, setResult] = useState<{ request: typeof request; view: ViewState }>();
+  const view: ViewState =
+    indexError !== undefined
+      ? { status: 'error', error: indexError }
+      : index?.portfolios.length === 0
+        ? { status: 'error', error: 'NOT_FOUND' }
+        : result?.request === request
+          ? result.view
+          : { status: 'loading' };
+  const foreground = useRef<typeof request | undefined>(undefined);
+  const pending = useRef<{ request: typeof request; refresh: () => Promise<void> } | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -94,7 +111,6 @@ export function App({
       if (loadedInfo.ok) setInfo(loadedInfo.value);
       if (!loadedIndex.ok) {
         setIndexError(loadedIndex.error);
-        setView({ status: 'error', error: loadedIndex.error });
         return;
       }
       setIndexError(undefined);
@@ -105,9 +121,6 @@ export function App({
           ? current
           : loadedIndex.value.portfolios[0]?.id,
       );
-      if (loadedIndex.value.portfolios.length === 0) {
-        setView({ status: 'error', error: 'NOT_FOUND' });
-      }
     })();
     return () => {
       active = false;
@@ -115,49 +128,72 @@ export function App({
   }, [source, generation]);
 
   useEffect(() => {
-    if (selected === undefined) return;
+    if (request.selected === undefined) return;
     let active = true;
-    setView({ status: 'loading' });
-    void source.view(selected).then((loaded) => {
-      if (!active) return;
-      setView(loaded.ok ? { status: 'ready', data: loaded.value } : { status: 'error', error: loaded.error });
+    foreground.current = request;
+    void request.source.view(request.selected).then((loaded) => {
+      if (!active || requestRef.current !== request) return;
+      foreground.current = undefined;
+      setResult({
+        request,
+        view: loaded.ok ? { status: 'ready', data: loaded.value } : { status: 'error', error: loaded.error },
+      });
+      if (pending.current?.request === request) {
+        const { refresh } = pending.current;
+        pending.current = undefined;
+        void refresh();
+      }
     });
     return () => {
       active = false;
+      if (foreground.current === request) foreground.current = undefined;
+      if (pending.current?.request === request) pending.current = undefined;
     };
-  }, [source, selected, generation]);
+  }, [request]);
 
   // Task 17.4, LIVE mode only: stream-driven refreshes of the shown view. The static replay
   // never creates live updates. A refresh replaces the view in place (no loading state); a
   // failed one keeps the previous view and is shown in the top bar.
-  const selectedRef = useRef(selected);
-  selectedRef.current = selected;
   const [live, setLive] = useState<LiveUpdates | undefined>(undefined);
-  const [refreshError, setRefreshError] = useState<LoadError | undefined>(undefined);
+  const [refreshFailure, setRefreshFailure] = useState<{ request: typeof request; error: LoadError }>();
+  const refreshError = refreshFailure?.request === request ? refreshFailure.error : undefined;
   useEffect(() => {
     if (source.kind !== 'LIVE' || liveUpdates === undefined) return;
+    let active = true;
+    let sequence = 0;
     const updates = liveUpdates({
-      selected: () => selectedRef.current,
-      refresh: async (portfolioId) => {
+      selected: () => requestRef.current.selected,
+      refresh: async function refreshPortfolio(portfolioId) {
+        const target = requestRef.current;
+        if (!active || target.source !== source || target.selected !== portfolioId) return;
+        if (foreground.current === target) {
+          pending.current = { request: target, refresh: () => refreshPortfolio(portfolioId) };
+          return;
+        }
+        const refresh = ++sequence;
         const loaded = await source.view(portfolioId);
-        if (selectedRef.current !== portfolioId) return; // the user moved on
+        if (!active || refresh !== sequence || requestRef.current !== target) return;
         if (loaded.ok) {
-          setRefreshError(undefined);
-          setView({ status: 'ready', data: loaded.value });
+          setRefreshFailure(undefined);
+          setResult({ request: target, view: { status: 'ready', data: loaded.value } });
         } else {
-          setRefreshError(loaded.error);
+          setRefreshFailure({ request: target, error: loaded.error });
         }
       },
     });
     setLive(updates);
     updates.start();
     return () => {
+      active = false;
       updates.stop();
       setLive(undefined);
     };
   }, [source, liveUpdates]);
 
-  const reload = useCallback(() => setGeneration((n) => n + 1), []);
+  const reload = useCallback(() => {
+    setIndexError(undefined);
+    setGeneration((n) => n + 1);
+  }, []);
   const data = view.status === 'ready' ? view.data : undefined;
 
   // Guided tour (ui-guidelines §8): user-started, non-modal, one inline card above its section.
@@ -168,26 +204,52 @@ export function App({
     setTourIndex(null);
     document.getElementById('tour-start')?.focus();
   }, []);
-  const toggleTour = useCallback(() => setTourIndex((i) => (i === null ? 0 : null)), []);
+  const goToStep = (index: number) => {
+    const step = steps[index];
+    if (step === undefined) return;
+    setTourIndex(index);
+    navigate(tourView(step.anchor));
+  };
+  const previousRoute = useRef(route);
+  useEffect(() => {
+    if (previousRoute.current === route) return;
+    previousRoute.current = route;
+    if (current !== undefined && tourView(current.anchor) === route) return;
+    setTourIndex(null);
+    document.getElementById(`view-${route}-title`)?.focus();
+  }, [route, current]);
   const tourAt = (anchor: TourAnchor): ReactElement | null =>
-    current === undefined || tourIndex === null || current.anchor !== anchor ? null : (
+    current === undefined ||
+    tourIndex === null ||
+    current.anchor !== anchor ||
+    tourView(anchor) !== route ? null : (
       <TourCard
         step={current}
         index={tourIndex}
         count={steps.length}
-        onBack={() => setTourIndex((i) => (i === null || i === 0 ? i : i - 1))}
-        onNext={() => setTourIndex((i) => (i === null || i >= steps.length - 1 ? i : i + 1))}
+        onBack={() => goToStep(tourIndex - 1)}
+        onNext={() => goToStep(tourIndex + 1)}
         onEnd={endTour}
       />
     );
 
   const dashboard = (
     <LiveContext.Provider value={live}>
-      <div className="app">
-        <a className="skip-link" href="#main">
+      <div className="app workspace" data-sidebar-collapsed={collapsed}>
+        <a
+          className="skip-link"
+          href="#main"
+          onClick={(event) => {
+            event.preventDefault();
+            document.getElementById('main')?.focus();
+          }}
+        >
           Skip to risk panels
         </a>
         <TopBar
+          view={route}
+          collapsed={collapsed}
+          onCollapse={() => setCollapsed((value) => !value)}
           source={info}
           index={index}
           selected={selected}
@@ -195,7 +257,7 @@ export function App({
           onReload={reload}
           data={data}
           refreshError={refreshError}
-          onTour={toggleTour}
+          onTour={current === undefined ? () => goToStep(0) : endTour}
           tourActive={current !== undefined}
         />
         {/* tabIndex -1: the skip link moves keyboard focus here, not only the scroll position. */}
@@ -220,41 +282,62 @@ export function App({
           ) : null}
           {data !== undefined ? (
             <>
-              {tourAt('summary')}
-              <SummarySection data={data} />
+              {route === 'overview' ? (
+                <>
+                  {tourAt('summary')}
+                  <SummarySection data={data} />
+                </>
+              ) : null}
               {data.dataMode === 'DEMO' ? (
                 <p className="demo-banner" role="note">
                   DEMO DATA: prices and history are deterministic fixtures, not market data. Results are
                   labelled DEMO_DATA and never raise alerts.
                 </p>
               ) : null}
-              {/* Fintech redesign (ui-guidelines §3): KPI cards, then the main visualisations
-                  (loss distribution beside allocation), then the four separate risk-dimension
-                  cards, then positions, currency, and FX. Group labels are plain text, outside
-                  the heading outline; each tour card stays directly above what it explains. */}
-              <p className="eyebrow">Risk visualisation</p>
-              {tourAt('charts')}
-              <div className="viz-grid" data-testid="viz-grid">
-                <LossDistributionSection data={data} />
-                <section className="section viz-allocation" aria-labelledby="allocation-heading">
-                  <h2 id="allocation-heading">Allocation</h2>
-                  <AllocationChart data={data} />
-                </section>
-              </div>
-              <p className="eyebrow">Currency exposure</p>
-              <CurrencyExposureSection data={data} />
-              <p className="eyebrow">Portfolio</p>
-              <PositionsSection data={data} />
-              <p className="eyebrow">Risk signals</p>
-              {tourAt('panels')}
-              <div className="panels">
-                <BaseVarPanel data={data} />
-                <AdjustedVarPanel data={data} />
-                <SentimentPanel data={data} />
-                <FilingPanel data={data} />
-              </div>
-              <p className="eyebrow">FX provenance</p>
-              <FxSection data={data} />
+              {route === 'overview' ? (
+                <div className="viz-grid" data-testid="viz-grid">
+                  <div className="workspace-preview">
+                    <LossDistributionSection data={data} compact />
+                    <a href={viewHref('risk')}>Open Risk Analytics</a>
+                  </div>
+                  <div className="workspace-preview">
+                    <section className="section viz-allocation" aria-labelledby="allocation-heading">
+                      <h2 id="allocation-heading">Allocation</h2>
+                      <AllocationChart data={data} />
+                    </section>
+                    <a href={viewHref('portfolio')}>Open Portfolio</a>
+                  </div>
+                </div>
+              ) : null}
+              {route === 'risk' ? (
+                <>
+                  {tourAt('charts')}
+                  <LossDistributionSection data={data} />
+                </>
+              ) : null}
+              {route === 'portfolio' ? (
+                <>
+                  {tourAt('allocation')}
+                  <section className="section viz-allocation" aria-labelledby="allocation-heading">
+                    <h2 id="allocation-heading">Allocation</h2>
+                    <AllocationChart data={data} />
+                  </section>
+                  <PositionsSection data={data} />
+                  <CurrencyExposureSection data={data} />
+                </>
+              ) : null}
+              {route === 'signals' ? (
+                <>
+                  {tourAt('panels')}
+                  <div className="panels">
+                    <BaseVarPanel data={data} />
+                    <AdjustedVarPanel data={data} />
+                    <SentimentPanel data={data} />
+                    <FilingPanel data={data} />
+                  </div>
+                </>
+              ) : null}
+              {route === 'fx' ? <FxSection data={data} /> : null}
             </>
           ) : null}
         </main>
