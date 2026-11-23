@@ -10,9 +10,7 @@ Prices and histories are synthetic DEMO fixtures. The replay uses a fixed refere
 
 - [Public demo](https://dathickboy.github.io/spectral-risk-chimera/) — static recorded replay, no backend. The five-view dashboard was merged (`df0ea19`) and deployed on 2026-11-22; signed-out public acceptance passed and all four served replay hashes match the approved baseline. Compiled frontend byte parity was verified on 2026-11-23 by a clean rebuild of the merge-commit source. See [release verification](docs/evidence/release-verification.md).
 - [Kiro usage and later contributions](docs/kiro-usage.md)
-- [Devpost draft](docs/devpost-submission.md)
-- [Video script and shot list](docs/demo-script.md)
-- [Submission checklist](docs/submission-checklist.md)
+- [Kiro evidence log](docs/evidence/kiro-evidence.md) and [transcript index](docs/evidence/kiro-transcript-index.md)
 
 ## Problem and motivation
 

@@ -48,4 +48,4 @@ The original violet `#7C5CE0` **failed** the CVD separation check against the bl
 
 These are the validated target values. The **lead engineer updates the steering token values** (`--chart-seq-*`, `--chart-tail`, `--chart-marker` in `.kiro/steering/ui-guidelines.md` and `src/web/styles.css`); this document records the validation evidence, not the token edit itself. Re-run the validator if any palette token changes again.
 
-Related: [release verification](release-verification.md) · [submission checklist](../submission-checklist.md)
+Related: [release verification](release-verification.md) · [Kiro evidence log](kiro-evidence.md)
