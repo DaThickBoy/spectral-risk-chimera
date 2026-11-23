@@ -2,7 +2,7 @@
 
 Historical target-swatch evidence only. This does not validate every color in the final CSS or the full allocation palette.
 
-Validated **2026-11-21** with the dataviz categorical-palette validator (six checks: lightness band, chroma floor, CVD separation for protan/deutan/tritan, normal-vision separation floor, and ≥3:1 contrast against the surface). This validates the redesigned dashboard's chart palette against the approved steering direction (`.kiro/steering/ui-guidelines.md`, decisions D1 light theme and D2 chart palette: blue/green/violet families, position numbers so colour is never the only cue).
+Validated **2026-11-21** with the dataviz categorical-palette validator (six checks: lightness band, chroma floor, CVD separation for protan/deutan/tritan, normal-vision separation floor, and ≥3:1 contrast against the surface). These target swatches were compared against the approved steering direction (`.kiro/steering/ui-guidelines.md`, decisions D1 light theme and D2 chart palette: blue/green/violet families, position numbers so colour is never the only cue).
 
 ## Results
 
@@ -48,4 +48,4 @@ The original violet `#7C5CE0` **failed** the CVD separation check against the bl
 
 These are the validated target values. The **lead engineer updates the steering token values** (`--chart-seq-*`, `--chart-tail`, `--chart-marker` in `.kiro/steering/ui-guidelines.md` and `src/web/styles.css`); this document records the validation evidence, not the token edit itself. Re-run the validator if any palette token changes again.
 
-Related: [release verification](release-verification.md) · [submission checklist](../submission-checklist.md)
+Related: [release verification](release-verification.md) · [Kiro evidence log](kiro-evidence.md)

@@ -1,8 +1,57 @@
 # Release verification — public GitHub Pages replay
 
-Status as of **2026-11-21**: **NOT VERIFIED**. No public-site check below may be marked passed until an owner-approved deployment of the release candidate exists and the signed-out checks pass. Deployment requires owner approval and must not be automated by an agent.
+Status as of **2026-11-23**: the release candidate was merged and deployed on 2026-11-22, and the signed-out public checks passed. Public replay-data parity is verified by served-byte hashes; compiled frontend byte parity was verified on 2026-11-23 by a clean rebuild of the merge-commit source (see below).
 
-## Current revisions
+## Verified release — 2026-11-22
+
+| Item                     | Value                                                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Approved feature commit  | `110f45d09f5a93ace5e1e34d94c298ba0b51e1d6` (`110f45d`, "feat(web): finalize five-view recorded replay dashboard")                              |
+| Deployed merge commit    | `df0ea197d64b5bb9cec8bc834ac0c5ecbfbc55a7` (`df0ea19`, "Merge pull request #10 from DaThickBoy/feat/fintech-dashboard")                        |
+| Merge CI                 | Run [45077667841](https://github.com/DaThickBoy/spectral-risk-chimera/actions/runs/45077667841), completed successfully on `df0ea19`           |
+| Pages deployment         | Run [45077667843](https://github.com/DaThickBoy/spectral-risk-chimera/actions/runs/45077667843), completed successfully on `df0ea19`           |
+| Local release validation | 3,816 unit/component/integration tests passed, one pre-existing skip; 68 Chromium tests passed (independent checkout of the 39-file candidate) |
+| Dedicated secret scan    | Gitleaks 8.30.1, exit 0, zero findings on the final 39-file candidate                                                                          |
+
+### Signed-out public acceptance (2026-11-22)
+
+Fresh Chromium contexts against <https://dathickboy.github.io/spectral-risk-chimera/>, no GitHub sign-in, no local backend; desktop requests observed only `GET` to the Pages origin.
+
+| Check                                 | Observed result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overview, `demo-eur-usd-gbp`          | NAV 22,375.74 EUR; Base VaR 124.10 EUR                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Overview, `demo-eur-only`             | NAV 14,025.44 EUR; Base VaR 140.18 EUR                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Risk Analytics                        | Exact bucket table opened: 20 buckets, 250 scenarios, 13 scenarios above the VaR marker                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Portfolio                             | Allocation and signed positions rendered for the multi-currency replay                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Risk Signals                          | Adjusted VaR disclosure explains no approved sentiment aggregation (OD-1); filing risk shows Not configured                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Mobile FX (390×844, touch)            | USD disclosure opened: published EUR→USD 1.1165, reference date 2026-11-06, inverse precision and rounding visible                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Replay status / navigation            | RECORDED REPLAY · Not live visible; touch menu navigated all five views                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Supplementary desktop pass (same day) | `?portfolio=demo-eur-only` URL loads 14,025.44 EUR / 140.18 EUR; cash 1000.00 EUR shown for both portfolios; replay disclosure shows DEMO DATA / RECORDED REPLAY recorded 2026-11-06 16:00 UTC / DEMO FIXTURES; GBP disclosure shows exact derived GBPEUR rate with ECB-EXR (REAL) source and publication-convention timestamp; "Source: ECB statistics." attribution present; **Fresh at replay time** badge present; EUR-only distribution: 250 scenarios, 20 buckets of 12.07 EUR, 13 exceedances, marker 140.18 EUR |
+
+### Public replay hashes (served bytes, re-verified 2026-11-22)
+
+| File                             | SHA-256                                                            |
+| -------------------------------- | ------------------------------------------------------------------ |
+| `demo-eur-only.json`             | `bf2ad5f650900163f07d9a5f805a77cf378c766ed4ea306122250d3f2ce30214` |
+| `demo-eur-usd-gbp.json`          | `630caac6d07f3a698b8f3d7cd94a4d87f5c54e49cb3f1ba84317f46a86ecb7bd` |
+| `ecb-exr-gbp-usd-2026-11-06.csv` | `be7147dd92819e669c69b7b485e2c8d3e826d82ff6bd3a1f946eb52489e5f30f` |
+| `manifest.json`                  | `d24767992ccee5bf184d725bf0bc56656a60bc359dd4e304638003860c808829` |
+
+All four match the approved baseline. This verifies **replay-data identity**, not compiled frontend identity.
+
+### Limitations
+
+- **Compiled frontend byte parity — verified 2026-11-23.** The merge-commit source (`df0ea19`) was rebuilt in a clean extraction (`npm run build`, Vite 8.3.6) and the outputs compared byte-for-byte against the served files: `assets/index-BbwqyaFa.js` SHA-256 `8be95cefc8ad1a84ff9415a112f2c8af2d72cc05eac010021b2df8e7c407f75b`, `assets/index-C3CUf28A.css` SHA-256 `98319904db1e96e2f6195641e672b91938f0794dca08ab9961fca45a26bffb0b`, and `index.html` — all three identical. The GitHub-reported Pages artifact digest was `sha256:e810a9ae43e72d39d71ff31b099d3f685afe988845940eab5077b44af1b8da83`. (The earlier local build in the feature worktree predated the final CSS commit and produced different hashes; the clean merge-source rebuild resolves this.)
+- The public pass did not exercise every bucket by pointer and keyboard or offline behavior; a full bucket-by-bucket JSON cross-check was not repeated publicly. The **Fresh at replay time** badge was confirmed present on the public summary.
+- Compiled frontend identity was established separately by the clean rebuild above, not by the replay hashes.
+
+---
+
+## Historical audit — 2026-11-21 (superseded by the verified release above)
+
+The sections below record the pre-deployment audit as it stood on 2026-11-21. Their NOT VERIFIED status, revision table, and manual checklist applied to that audit and are superseded by the verified release section above.
+
+### Revisions at audit time
 
 | Item                                | Value                                                                                                                     |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -12,7 +61,7 @@ Status as of **2026-11-21**: **NOT VERIFIED**. No public-site check below may be
 | Branch vs `main`                    | Diverged: 3 commits on the branch not on `main` (`dfba204`, `0636e2b`, `75ce8d6`); 1 merge commit on `main` not on branch |
 | Newest discovered public deployment | Reported built from commit `3234dab` — **not present in the local repository**; its contents could not be inspected       |
 
-## Historical deployment mismatch
+### Deployment mismatch at audit time
 
 - The audited branch HEAD is `75ce8d6`. The newest discovered public deployment was reported as built from `3234dab`. That commit does not exist locally (no local or fetched ref contains it), so the deployed contents cannot be compared with any local artifact. **Parity between the public site and the branch is unverified.**
 - Earlier claim: the previous submission checklist recorded that on 2026-11-11 the public manifest, both portfolio responses, and the recorded ECB response matched the then-current local replay byte for byte. No standalone evidence file for that check was committed, so it stands as a historical report only. It predates the redesign commits and does not establish current parity.
@@ -99,7 +148,7 @@ Target release SHA: _pending owner approval_. Workflow run: _none_. Verification
 | 14  | Public replay manifest and served JSON/ECB bytes match the approved hashes; served HTML/assets match the approved workflow artifact                      | UNVERIFIED |
 | 15  | Public site version matches the version shown in the demo video                                                                                          | UNVERIFIED |
 
-Related: [submission checklist](../submission-checklist.md) · [demo script](../demo-script.md) · [palette validation](palette-validation.md)
+Related: [palette validation](palette-validation.md) · [Kiro evidence log](kiro-evidence.md) · [Kiro usage](../kiro-usage.md)
 
 ## Final acceptance rerun (2026-11-22, uncommitted candidate)
 
